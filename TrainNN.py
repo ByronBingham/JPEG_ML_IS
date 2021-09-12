@@ -1,7 +1,13 @@
 import tensorflow as tf
-import tensorflow.keras.layers as Layers
-from modules import Model
+import datetime as dt
 
+from modules import Model
+from modules.NNConfig import EPOCHS, LEARNING_RATE
+
+
+model = None
+trainData = None
+testData = None
 
 def TF_Init():
     tf.compat.v1.enable_control_flow_v2()
@@ -18,10 +24,35 @@ def TF_Init():
         print(e)
 
 
-def createModel(input_layer):
-    return Model.jpgEnhanceModel(input_layer)
+def main():
+    TF_Init()
+    model = Model.EQLRI_model()
 
 
-model = createModel(Layers.Input(shape=(96, 96, 3), dtype=tf.dtypes.float16))
+def train():
+    time1 = dt.datetime.now()
 
-print(model)
+    for epoch in range(EPOCHS):
+        do_epoch()
+        do_test()
+
+
+
+def do_epoch():
+    batches = 0
+    for batch in trainData:
+        optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)
+
+        with tf.GradientTape() as tape:
+            tape.watch(model.trainable_variables)
+
+    do_eval()
+
+def do_eval():
+
+
+def do_test():
+    for batch in testData:
+
+
+
