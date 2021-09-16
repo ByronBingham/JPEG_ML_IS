@@ -13,7 +13,7 @@ def EQLRI_model():
 
     inputs = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
 
-    layer1 = Conv2D(filters=128, kernel_size=(9, 9), **conv_args)(inputs)
+    layer1 = Conv2D(filters=64, kernel_size=(9, 9), **conv_args)(inputs)
 
     layer2 = Conv2D(filters=64, kernel_size=(1, 1), **conv_args)(layer1)
 
@@ -21,7 +21,7 @@ def EQLRI_model():
 
     output = layer3
 
-    return inputs, output
+    return tf.keras.Model(inputs, output)
 
 
 def kerasExample_model():
@@ -41,4 +41,10 @@ def kerasExample_model():
 
     output = Conv2D(filters=3, kernel_size=3, **conv_args)(layer3)
 
-    return inputs, output
+    return tf.keras.Model(inputs, output)
+
+
+modelSwitch = {
+    'eqlri': EQLRI_model(),
+    'kerasexample': kerasExample_model()
+}

@@ -29,3 +29,10 @@ def MeanGradientError(outputs, targets):
     mge = tf.math.reduce_sum(tf.math.squared_difference(output_gradients, target_gradients) / (shape[0] * shape[1]))
 
     return mge
+
+
+def MGE_MSE_combinedLoss(outputs, targets):
+    mge = MeanGradientError(outputs, targets)
+    mse = tf.losses.mse(targets, outputs)
+    
+    return 0.5 * mge + 0.5 * mse

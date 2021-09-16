@@ -1,13 +1,12 @@
 import tensorflow as tf
 import datetime as dt
+import numpy as np
 
 from modules import Model
-from modules.NNConfig import EPOCHS, LEARNING_RATE
+from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE
+from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET
+from modules.Losses import MGE_MSE_combinedLoss
 
-
-model = None
-trainData = None
-testData = None
 
 def TF_Init():
     tf.compat.v1.enable_control_flow_v2()
@@ -24,35 +23,99 @@ def TF_Init():
         print(e)
 
 
-def main():
-    TF_Init()
-    model = Model.EQLRI_model()
+class TrainNN:
+    model = None
+    trainData = None
+    testData = None
 
+    def __init__(self):
+        TF_Init()
+        self.model = Model.modelSwitch[NN_MODEL]
 
-def train():
-    time1 = dt.datetime.now()
+        self.trainData = JPEGDataset('train')
+        self.testData = JPEGDataset('validation')
 
-    for epoch in range(EPOCHS):
-        do_epoch()
-        do_test()
+        self.info = NN_MODEL + "_" + str(EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
+            LEARNING_RATE)
+        self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
+        self.lossTrainCsv = "./stats/loss_train_" + self.info + ".csv"
+        self.psnrTestCsv = "./stats/psnr_test_" + self.info + ".csv"
+        self.lossTestCsv = "./stats/loss_test_" + self.info + ".csv"
 
+    def train(self):
+        time1 = dt.datetime.now()
 
+        for epoch in range(EPOCHS):
+            self.do_epoch(epoch)
+            print("\nEpoch " + str(epoch) + " finished. Starting test step\n")
+            self.do_test(epoch)
 
-def do_epoch():
-    batches = 0
-    for batch in trainData:
+    def do_epoch(self, epoch):
         optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)
+        batches = 0
+        total_loss = 0.0
+        total_psnr = 0.0
 
-        with tf.GradientTape() as tape:
-            tape.watch(model.trainable_variables)
+        for batch in self.trainData:
+            with tf.GradientTape() as tape:
+                tape.watch(self.model.trainable_variables)
+                model_out = self.model(batch[BATCH_COMPRESSED], training=True)
 
-    do_eval()
+                # multiply output by the padding mask to make sure padded areas are 0
+                model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK])
 
-def do_eval():
+                loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET])
+                psnr = tf.image.psnr(batch[BATCH_TARGET], model_out, max_val=1.0)
+
+                total_loss += np.average(loss)
+                total_psnr += np.sum(psnr)
+
+                gradients = tape.gradient(loss, self.model.trainable_variables)
+                gradients = [tf.clip_by_norm(g, GRAD_NORM) for g in gradients]
+                optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+            print("Batch " + str(batches + 1) + " Complete")
+            batches = batches + 1
+
+        avg_loss = total_loss / batches
+        avg_psnr = total_psnr / batches
+
+        lossFile = open(self.lossTrainCsv)
+        psnrFile = open(self.psnrTrainCsv)
+        lossFile.write(str(epoch) + "," + str(avg_loss))
+        psnrFile.write(str(epoch) + "," + str(avg_psnr))
+        lossFile.close()
+        psnrFile.close()
+
+        self.do_eval()
+
+    def do_eval(self):
+        print("Eval step NYI")
+
+    def do_test(self, epoch):
+        total_loss = 0.0
+        total_psnr = 0.0
+        batches = 0
+
+        for batch in self.testData:
+            model_out = self.model(batch[BATCH_COMPRESSED], training=True)
+
+            loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET])
+            psnr = tf.image.psnr(batch[BATCH_TARGET], model_out, max_val=1.0)
+            total_loss += np.average(loss)
+            total_psnr += np.sum(psnr)
+            batches += 1
+
+        avg_loss = total_loss / batches
+        avg_psnr = total_psnr / batches
+
+        lossFile = open(self.lossTestCsv)
+        psnrFile = open(self.psnrTestCsv)
+        lossFile.write(str(epoch) + "," + str(avg_loss))
+        psnrFile.write(str(epoch) + "," + str(avg_psnr))
+        lossFile.close()
+        psnrFile.close()
 
 
-def do_test():
-    for batch in testData:
+trainNn = TrainNN()
 
-
-
+trainNn.train()
