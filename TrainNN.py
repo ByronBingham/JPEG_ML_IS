@@ -10,6 +10,7 @@ from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_S
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET, preprocessDataForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
+from pathlib import Path
 
 
 # TODO: save model every epoch
@@ -124,7 +125,11 @@ class TrainNN:
         testData = JPEGDataset('validation')
 
         for batch in testData:
-            model_out = self.model(batch[BATCH_COMPRESSED], training=True)
+            if NN_MODEL == 'strrn':
+                structureIn, textureIn = preprocessDataForSTRRN(batch)
+                model_out = self.model([structureIn, textureIn], training=True)
+            else:
+                model_out = self.model(batch[BATCH_COMPRESSED], training=True)
 
             loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET])
             psnr = tf.image.psnr(batch[BATCH_TARGET], model_out, max_val=1.0)
@@ -154,9 +159,13 @@ class TrainNN:
             nn_input = np.array(pil_img, dtype='float32') / 255.0
             nn_input = np.expand_dims(nn_input, axis=0)
 
-            output = self.model(nn_input)
+            if NN_MODEL == 'strrn':
+                structureIn, textureIn = preprocessDataForSTRRN(np.asarray([nn_input]))
+                model_out = self.model([structureIn, textureIn])
+            else:
+                model_out = self.model(nn_input)
 
-            self.saveNNOutput(output, "./sampleImageOutputs/" + file + "_" + self.info + "_" + str(epoch) + ".png")
+            self.saveNNOutput(model_out, "./sampleImageOutputs/" + file + "_" + self.info + "_" + str(epoch) + ".png")
 
             '''
             output = output * 255.0
@@ -196,12 +205,18 @@ class TrainNN:
         os.mkdir("stats")
         os.mkdir("checkpoints")
         os.mkdir("sampleImageOutputs")
+        Path("stats/.gitkeep").touch()
+        Path("checkpoints/.gitkeep").touch()
+        Path("sampleImageOutputs/.gitkeep").touch()
 
     @staticmethod
     def clean_dirs():
-        shutil.rmtree("stats")
-        shutil.rmtree("checkpoints")
-        shutil.rmtree("sampleImageOutputs")
+        try:
+            shutil.rmtree("stats")
+            shutil.rmtree("checkpoints")
+            shutil.rmtree("sampleImageOutputs")
+        except FileNotFoundError:
+            print("Nothing to delete here")
 
 
 trainNn = TrainNN()
