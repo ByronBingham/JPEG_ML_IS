@@ -74,7 +74,7 @@ class TrainNN:
             with tf.GradientTape() as tape:
                 tape.watch(self.model.trainable_variables)
                 if NN_MODEL == 'strrn':
-                    structureIn, textureIn = preprocessDataForSTRRN
+                    structureIn, textureIn = preprocessDataForSTRRN(batch)
                     model_out = self.model([structureIn, textureIn], training=True)
                 else:
                     model_out = self.model(batch[BATCH_COMPRESSED], training=True)
@@ -200,7 +200,6 @@ class TrainNN:
         shutil.rmtree("stats")
         shutil.rmtree("checkpoints")
         shutil.rmtree("sampleImageOutputs")
-
 
 trainNn = TrainNN()
 trainNn.sample_compress()

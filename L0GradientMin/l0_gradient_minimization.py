@@ -9,7 +9,7 @@ import numpy as np
 from scipy.fftpack import fft, ifft, fft2, ifft2, fftshift, ifftshift
 import matplotlib.pyplot as plt
 
-from demo_util import *
+from L0GradientMin.demo_util import *
 
 # 1D
 def circulantshift(xs, h):
@@ -79,8 +79,8 @@ def l0_gradient_minimization_2d(I, lmd, beta_max, beta_rate=2.0, max_iter=30, re
     Ny, Nx = S.shape[:2]
     D = S.shape[2] if S.ndim == 3 else 1
     dx, dy = np.zeros((Ny, Nx)), np.zeros((Ny, Nx))
-    dx[Ny/2, Nx/2-1:Nx/2+1] = [-1, 1]
-    dy[Ny/2-1:Ny/2+1, Nx/2] = [-1, 1]
+    dx[int(Ny / 2), int(Nx / 2 - 1):int(Nx / 2 + 1)] = [-1, 1]
+    dy[int(Ny/2-1):int(Ny/2+1), int(Nx/2)] = [-1, 1]
     F_denom = np.abs(fft2(dx))**2.0 + np.abs(fft2(dy))**2.0
     if D > 1: F_denom = np.dstack([F_denom]*D)
 

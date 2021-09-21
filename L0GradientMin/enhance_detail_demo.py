@@ -4,8 +4,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from l0_gradient_minimization import l0_gradient_minimization_2d
-from demo_util import *
+from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
+from L0GradientMin.demo_util import *
 
 def enhance_detail_demo():
     def add_arguments(parser):

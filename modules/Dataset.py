@@ -3,9 +3,9 @@ import numpy as np
 
 from PIL import Image
 from io import BytesIO
-from modules.L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
+from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 
-from modules.NNConfig import DATASET_PREFETCH, BATCH_SIZE, JPEG_QUALITY
+from modules.NNConfig import DATASET_PREFETCH, BATCH_SIZE, JPEG_QUALITY, L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX
 
 BATCH_COMPRESSED = 0
 BATCH_TARGET = 1
@@ -114,9 +114,10 @@ def preprocessDataForSTRRN(batch):
     batch_structure = []
     batch_texture = []
 
-    for b in range(batch.shape[0]):
+    for b in range(batch[0].shape[0]):
         originalCompressed = batch[b][BATCH_COMPRESSED]
-        imageStructure = l0_gradient_minimization_2d(originalCompressed, lmd=0.1, beta_max=0.00001)
+        imageStructure = l0_gradient_minimization_2d(originalCompressed, lmd=L0_GRADIENT_MIN_LAMDA,
+                                                     beta_max=L0_GRADIENT_MIN_BETA_MAX)
         imageTexture = np.subtract(originalCompressed, imageStructure)
 
         batch_structure.append(imageStructure)

@@ -51,7 +51,7 @@ def STRRN():
     structure_mprrn = MPRRN(structure_input, rrusPerIrb=MPRRN_RRU_PER_IRB, irbCount=MPRRN_IRBS)
     texture_mprrn = MPRRN(texture_input, rrusPerIrb=MPRRN_RRU_PER_IRB, irbCount=MPRRN_IRBS)
 
-    aggregator_input = Add()(structure_mprrn, texture_mprrn)
+    aggregator_input = Add()([structure_mprrn, texture_mprrn])
 
     aggregator = MPRRN(aggregator_input, rrusPerIrb=1, irbCount=1)
 
@@ -73,7 +73,7 @@ def MPRRN(inputs, rrusPerIrb, irbCount):
             irbs.append(MPRRN_IRB(sums[i - 1], rrusPerIrb))
             sums.append(Add()([irbs[i], conv_1]))
 
-    conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(sums[-1])
+    conv_2 = Conv2D(filters=INPUT_SHAPE[-1], kernel_size=MPRRN_FILTER_SHAPE, padding='same')(sums[-1])
 
     out = Add()([inputs, conv_2])
 
