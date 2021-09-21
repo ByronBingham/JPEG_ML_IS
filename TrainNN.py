@@ -7,7 +7,7 @@ import numpy as np
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH
-from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET
+from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET, preprocessDataForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
 
@@ -73,7 +73,11 @@ class TrainNN:
         for batch in trainData:
             with tf.GradientTape() as tape:
                 tape.watch(self.model.trainable_variables)
-                model_out = self.model(batch[BATCH_COMPRESSED], training=True)
+                if NN_MODEL == 'strrn':
+                    structureIn, textureIn = preprocessDataForSTRRN
+                    model_out = self.model([structureIn, textureIn], training=True)
+                else:
+                    model_out = self.model(batch[BATCH_COMPRESSED], training=True)
 
                 # DEBUG
                 # self.saveNNOutput(model_out, "NN_Output.png")

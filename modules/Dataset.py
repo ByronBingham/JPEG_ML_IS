@@ -3,6 +3,7 @@ import numpy as np
 
 from PIL import Image
 from io import BytesIO
+from modules.L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 
 from modules.NNConfig import DATASET_PREFETCH, BATCH_SIZE, JPEG_QUALITY
 
@@ -107,3 +108,21 @@ class JPEGDataset(object):
         # DEBUG
         self.test += 1
         return compressed_images, target_images, pad_mask
+
+
+def preprocessDataForSTRRN(batch):
+    batch_structure = []
+    batch_texture = []
+
+    for b in range(batch.shape[0]):
+        originalCompressed = batch[b][BATCH_COMPRESSED]
+        imageStructure = l0_gradient_minimization_2d(originalCompressed, lmd=0.1, beta_max=0.00001)
+        imageTexture = np.subtract(originalCompressed, imageStructure)
+
+        batch_structure.append(imageStructure)
+        batch_texture.append(imageTexture)
+
+    batch_structure = np.asarray(batch_structure)
+    batch_texture = np.asarray(batch_texture)
+
+    return batch_structure, batch_texture
