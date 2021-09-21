@@ -4,3 +4,4 @@
 ./sampleImageOutputs/**
 ./savedResults/**
 ./modules/__pycache__
+./checkpoints
