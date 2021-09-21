@@ -5,7 +5,8 @@ from PIL import Image
 from io import BytesIO
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 
-from modules.NNConfig import DATASET_PREFETCH, BATCH_SIZE, JPEG_QUALITY, L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX
+from modules.NNConfig import DATASET_PREFETCH, BATCH_SIZE, JPEG_QUALITY, L0_GRADIENT_MIN_LAMDA, \
+    L0_GRADIENT_MIN_BETA_MAX, DATASETS_DIR
 
 BATCH_COMPRESSED = 0
 BATCH_TARGET = 1
@@ -16,9 +17,10 @@ class JPEGDataset(object):
 
     def __init__(self, dataset_type):
         if dataset_type == 'train':
-            self.div2k = tfds.load("div2k", shuffle_files=True, data_dir="x:/div2k_dataset/", split="train")
+            self.div2k = tfds.load("div2k", shuffle_files=True, data_dir=DATASETS_DIR + "div2k_dataset/", split="train")
         else:
-            self.div2k = tfds.load("div2k", shuffle_files=True, data_dir="x:/div2k_dataset/", split="validation")
+            self.div2k = tfds.load("div2k", shuffle_files=True, data_dir=DATASETS_DIR + "div2k_dataset/",
+                                   split="validation")
 
         self.div2k = self.div2k.prefetch(DATASET_PREFETCH)
         self.ds_iter = iter(self.div2k)

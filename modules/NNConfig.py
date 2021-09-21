@@ -19,3 +19,4 @@ GRAD_NORM = 1.0  # max value for gradients. Clipping gradients to prevent NaN is
 ADAM_EPSILON = 0.001
 SAMPLE_IMAGES = ["./sampleCartoonImage", "./samplePhotoImage"]
 CHECKPOINTS_PATH = "./checkpoints"
+DATASETS_DIR = "x:/"
