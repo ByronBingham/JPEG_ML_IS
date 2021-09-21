@@ -201,6 +201,7 @@ class TrainNN:
         shutil.rmtree("checkpoints")
         shutil.rmtree("sampleImageOutputs")
 
+
 trainNn = TrainNN()
 trainNn.sample_compress()
 
