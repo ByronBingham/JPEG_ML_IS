@@ -1,6 +1,10 @@
 # NN config
 INPUT_SHAPE = (None, None, 3)
 NN_MODEL = 'kerasexample'
+MPRRN_FILTERS_PER_LAYER = 128
+MPRRN_FILTER_SHAPE = 3
+MPRRN_RRU_PER_IRB = 3
+MPRRN_IRBS = 3
 
 # Train config
 LOAD_WEIGHTS = False
