@@ -6,8 +6,8 @@ import numpy as np
 
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
-    ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH
-from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET, preprocessDataForSTRRN
+    ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY
+from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET, preprocessInputsForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
 from pathlib import Path
@@ -56,9 +56,12 @@ class TrainNN:
 
     def train(self):
         time1 = dt.datetime.now()
+        learningRate = LEARNING_RATE
 
         for epoch in range(EPOCHS):
-            self.do_epoch(epoch)
+            if epoch % LEARNING_RATE_DECAY_INTERVAL == 0:
+                learningRate = learningRate / LEARNING_RATE_DECAY
+            self.do_epoch(epoch, learningRate)
             self.save_weights()
             print("\nEpoch " + str(epoch) + " finished. Starting test step\n")
             self.do_test(epoch)
@@ -66,40 +69,44 @@ class TrainNN:
 
         self.save_training_results()
 
-    def do_epoch(self, epoch):
-        optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE, epsilon=ADAM_EPSILON)
+    def do_epoch(self, epoch, learningRate):
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learningRate, epsilon=ADAM_EPSILON)
         batches = 0
         total_loss = 0.0
         total_psnr = 0.0
         trainData = JPEGDataset('train')
 
         for batch in trainData:
-            with tf.GradientTape() as tape:
-                tape.watch(self.model.trainable_variables)
-                if NN_MODEL == 'strrn':
-                    structureIn, textureIn = preprocessDataForSTRRN(batch)
-                    model_out = self.model([structureIn, textureIn], training=True)
-                else:
-                    model_out = self.model(batch[BATCH_COMPRESSED], training=True)
+            structureIn, textureIn = None, None
+            if NN_MODEL == 'strrn':
+                structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
+            for c in range(3):  # do separate training pass for each RGB channel
+                with tf.GradientTape() as tape:
+                    tape.watch(self.model.trainable_variables)
+                    if NN_MODEL == 'strrn':
+                        model_out = self.model([structureIn[..., c:c+1], textureIn[..., c:c+1]], training=True)
+                    else:
+                        model_out = self.model(batch[BATCH_COMPRESSED][..., c:c+1], training=True)
 
-                # DEBUG
-                # self.saveNNOutput(model_out, "NN_Output.png")
-                # self.saveNNOutput(batch[BATCH_COMPRESSED], "This_should_be_NN_input.png")
-                # self.saveNNOutput(batch[BATCH_TARGET], "This_should_be_target_data.png")
-                # DEBUG
+                    # DEBUG
+                    # self.saveNNOutput(model_out, "NN_Output.png")
+                    # self.saveNNOutput(batch[BATCH_COMPRESSED], "This_should_be_NN_input.png")
+                    # self.saveNNOutput(batch[BATCH_TARGET], "This_should_be_target_data.png")
+                    # DEBUG
 
-                # multiply output by the padding mask to make sure padded areas are 0
-                model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK])
+                    # multiply output by the padding mask to make sure padded areas are 0
+                    model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c+1])
 
-                loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET])
-                psnr = tf.image.psnr(batch[BATCH_TARGET], model_out, max_val=1.0)
+                    loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c+1])
+                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c+1], model_out, max_val=1.0)
 
-                total_loss += np.average(loss)
-                total_psnr += np.sum(psnr)
+                    total_loss += np.average(loss)
+                    total_psnr += np.sum(psnr)
 
-                gradients = tape.gradient(loss, self.model.trainable_variables)
-                gradients = [tf.clip_by_norm(g, GRAD_NORM) for g in gradients]
-                optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+                    gradients = tape.gradient(loss, self.model.trainable_variables)
+                    gradients = [tf.clip_by_norm(g, GRAD_NORM) for g in gradients]
+                    optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+
             print("Batch " + str(batches + 1) + " Complete")
             batches = batches + 1
 
@@ -125,17 +132,22 @@ class TrainNN:
         testData = JPEGDataset('validation')
 
         for batch in testData:
+            structureIn, textureIn = None, None
             if NN_MODEL == 'strrn':
-                structureIn, textureIn = preprocessDataForSTRRN(batch)
-                model_out = self.model([structureIn, textureIn], training=True)
-            else:
-                model_out = self.model(batch[BATCH_COMPRESSED], training=True)
+                structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
 
-            loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET])
-            psnr = tf.image.psnr(batch[BATCH_TARGET], model_out, max_val=1.0)
-            total_loss += np.average(loss)
-            total_psnr += np.sum(psnr)
-            batches += 1
+            for c in range(3):
+
+                if NN_MODEL == 'strrn':
+                    model_out = self.model([structureIn[..., c:c+1], textureIn[..., c:c+1]])
+                else:
+                    model_out = self.model(batch[BATCH_COMPRESSED][..., c:c+1])
+
+                loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c+1])
+                psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c+1], model_out, max_val=1.0)
+                total_loss += np.average(loss)
+                total_psnr += np.sum(psnr)
+                batches += 1
 
         avg_loss = total_loss / batches
         avg_psnr = total_psnr / batches
@@ -159,20 +171,25 @@ class TrainNN:
             nn_input = np.array(pil_img, dtype='float32') / 255.0
             nn_input = np.expand_dims(nn_input, axis=0)
 
+            structureIn, textureIn = None, None
             if NN_MODEL == 'strrn':
-                structureIn, textureIn = preprocessDataForSTRRN(np.asarray([nn_input]))
-                model_out = self.model([structureIn, textureIn])
-            else:
-                model_out = self.model(nn_input)
+                structureIn, textureIn = preprocessInputsForSTRRN(np.asarray(nn_input))
 
-            self.saveNNOutput(model_out, "./sampleImageOutputs/" + file + "_" + self.info + "_" + str(epoch) + ".png")
+            channels_out = []
+            for c in range(3):
 
-            '''
-            output = output * 255.0
-            output = np.array(output).astype('uint8')
-            out_img = Image.fromarray(output[0])
-            out_img.save("./sampleImageOutputs/" + "sampleImage_" + self.info + "_" + str(epoch) + ".png", format="PNG")
-            '''
+                if NN_MODEL == 'strrn':
+                    model_out = self.model([structureIn[..., c:c+1], textureIn[..., c:c+1]])
+                else:
+                    model_out = self.model(nn_input[..., c:c+1])
+
+                channels_out.append(np.asarray(model_out))
+
+            arr = np.array(channels_out)
+            image_out = np.concatenate(arr, axis=-1)
+
+            self.saveNNOutput(image_out, "./sampleImageOutputs/" + file + "_" + self.info + "_" + str(epoch) + ".png")
+
 
     @staticmethod
     def saveNNOutput(output, file):

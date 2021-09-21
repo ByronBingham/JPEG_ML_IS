@@ -36,11 +36,11 @@ class JPEGDataset(object):
         compressed_images = []
         i = 0
 
-
+        '''
         # debug code
         if self.test >= 10:
             raise StopIteration
-
+        '''
 
         for e in range(BATCH_SIZE):
             # add original image to targets
@@ -112,12 +112,17 @@ class JPEGDataset(object):
         return compressed_images, target_images, pad_mask
 
 
-def preprocessDataForSTRRN(batch):
+def preprocessInputsForSTRRN(batch_compressed):
+    '''
+
+    :param batch_compressed: compressed images only (no targets or masks)
+    :return:
+    '''
     batch_structure = []
     batch_texture = []
 
-    for b in range(batch[0].shape[0]):
-        originalCompressed = batch[b][BATCH_COMPRESSED]
+    for b in range(batch_compressed.shape[0]):
+        originalCompressed = batch_compressed[b]
         imageStructure = l0_gradient_minimization_2d(originalCompressed, lmd=L0_GRADIENT_MIN_LAMDA,
                                                      beta_max=L0_GRADIENT_MIN_BETA_MAX)
         imageTexture = np.subtract(originalCompressed, imageStructure)
