@@ -1,2 +1,6 @@
 .idea
 ./stats/**
+./checkpoints/**
+./sampleImageOutputs/**
+./savedResults/**
+./modules/__pycache__

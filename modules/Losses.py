@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 
 def MeanGradientError(outputs, targets):
@@ -34,5 +35,6 @@ def MeanGradientError(outputs, targets):
 def MGE_MSE_combinedLoss(outputs, targets):
     mge = MeanGradientError(outputs, targets)
     mse = tf.losses.mse(targets, outputs)
-    
-    return 0.5 * mge + 0.5 * mse
+
+    out = 0.1 * float(mge) + mse  # leave mge cast to float. NN seems to explode (NaN's) if mge is left as-is
+    return out

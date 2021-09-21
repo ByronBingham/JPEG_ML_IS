@@ -21,6 +21,8 @@ class JPEGDataset(object):
 
         self.div2k = self.div2k.prefetch(DATASET_PREFETCH)
         self.ds_iter = iter(self.div2k)
+
+        # DEBUG
         self.test = 0
 
     def __iter__(self):
@@ -31,18 +33,25 @@ class JPEGDataset(object):
         compressed_images = []
         i = 0
 
-        if self.test >= 2:
+        '''
+        # debug code
+        if self.test >= 20:
             raise StopIteration
+        '''
 
-        for example in self.ds_iter:
+        for e in range(BATCH_SIZE):
             # add original image to targets
+            example = next(self.ds_iter)
+            if example is None:
+                raise StopIteration
             img = np.asarray(example['lr'])
             img = img.astype('float32')
             img = img / 255.0
             target_images.append(img)
 
             # compress image and add to inputs
-            pil_img = Image.fromarray(np.asarray(example['lr']))
+            tmp = np.asarray(example['lr'])
+            pil_img = Image.fromarray(tmp)
             buffer = BytesIO()
             pil_img.save(buffer, format="JPEG", quality=JPEG_QUALITY)
             pil_img = Image.open(buffer)
@@ -95,8 +104,6 @@ class JPEGDataset(object):
         compressed_images = np.asarray(compressed_images)
         pad_mask = np.asarray(pad_mask)
 
+        # DEBUG
         self.test += 1
         return compressed_images, target_images, pad_mask
-
-    def shuffleAndReset(self):
-
