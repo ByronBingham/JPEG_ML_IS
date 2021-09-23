@@ -84,9 +84,9 @@ class TrainNN:
                 with tf.GradientTape() as tape:
                     tape.watch(self.model.trainable_variables)
                     if NN_MODEL == 'strrn':
-                        model_out = self.model([structureIn[..., c:c+1], textureIn[..., c:c+1]], training=True)
+                        model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]], training=True)
                     else:
-                        model_out = self.model(batch[BATCH_COMPRESSED][..., c:c+1], training=True)
+                        model_out = self.model(batch[BATCH_COMPRESSED][..., c:c + 1], training=True)
 
                     # DEBUG
                     # self.saveNNOutput(model_out, "NN_Output.png")
@@ -95,13 +95,13 @@ class TrainNN:
                     # DEBUG
 
                     # multiply output by the padding mask to make sure padded areas are 0
-                    model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c+1])
+                    model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c + 1])
 
-                    loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c+1])
-                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c+1], model_out, max_val=1.0)
+                    loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
+                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
 
                     total_loss += np.average(loss)
-                    total_psnr += np.sum(psnr)
+                    total_psnr += np.average(psnr)
 
                     gradients = tape.gradient(loss, self.model.trainable_variables)
                     gradients = [tf.clip_by_norm(g, GRAD_NORM) for g in gradients]
@@ -110,8 +110,8 @@ class TrainNN:
             print("Batch " + str(batches + 1) + " Complete")
             batches = batches + 1
 
-        avg_loss = total_loss / batches
-        avg_psnr = total_psnr / batches
+        avg_loss = total_loss / batches / 3
+        avg_psnr = total_psnr / batches / 3
 
         lossFile = open(self.lossTrainCsv, "a")
         psnrFile = open(self.psnrTrainCsv, "a")
@@ -139,18 +139,19 @@ class TrainNN:
             for c in range(3):
 
                 if NN_MODEL == 'strrn':
-                    model_out = self.model([structureIn[..., c:c+1], textureIn[..., c:c+1]])
+                    model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
                 else:
-                    model_out = self.model(batch[BATCH_COMPRESSED][..., c:c+1])
+                    model_out = self.model(batch[BATCH_COMPRESSED][..., c:c + 1])
 
-                loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c+1])
-                psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c+1], model_out, max_val=1.0)
+                loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
+                psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
                 total_loss += np.average(loss)
-                total_psnr += np.sum(psnr)
-                batches += 1
+                total_psnr += np.average(psnr)
 
-        avg_loss = total_loss / batches
-        avg_psnr = total_psnr / batches
+            batches += 1
+
+        avg_loss = total_loss / batches / 3
+        avg_psnr = total_psnr / batches / 3
 
         lossFile = open(self.lossTestCsv, "a")
         psnrFile = open(self.psnrTestCsv, "a")
@@ -179,9 +180,9 @@ class TrainNN:
             for c in range(3):
 
                 if NN_MODEL == 'strrn':
-                    model_out = self.model([structureIn[..., c:c+1], textureIn[..., c:c+1]])
+                    model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
                 else:
-                    model_out = self.model(nn_input[..., c:c+1])
+                    model_out = self.model(nn_input[..., c:c + 1])
 
                 channels_out.append(np.asarray(model_out))
 
@@ -189,7 +190,6 @@ class TrainNN:
             image_out = np.concatenate(arr, axis=-1)
 
             self.saveNNOutput(image_out, "./sampleImageOutputs/" + file + "_" + self.info + "_" + str(epoch) + ".png")
-
 
     @staticmethod
     def saveNNOutput(output, file):
