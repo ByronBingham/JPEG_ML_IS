@@ -3,8 +3,8 @@ from PIL import Image
 import os
 import numpy as np
 
-DATASET_PATH = 'x:/div2k_dataset/downloads/extracted/'
-OUTPUT_PATH = 'x:/div2k_dataset/preprocessed/'
+DATASET_PATH = 'x:/datasets/div2k_dataset/downloads/extracted/'
+OUTPUT_PATH = 'x:/datasets/div2k_dataset/preprocessed/'
 
 PATCH_SIZE = 31
 STRIDE = 21

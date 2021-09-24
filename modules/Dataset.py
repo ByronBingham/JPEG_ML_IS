@@ -1,12 +1,15 @@
 import tensorflow_datasets as tfds
+import tensorflow as tf
 import numpy as np
+import random as rand
+import datasets.urban100_dataset
 
 from PIL import Image
 from io import BytesIO
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 
-from modules.NNConfig import DATASET_PREFETCH, BATCH_SIZE, JPEG_QUALITY, L0_GRADIENT_MIN_LAMDA, \
-    L0_GRADIENT_MIN_BETA_MAX, DATASETS_DIR
+from modules.NNConfig import DATASET_PREFETCH, JPEG_QUALITY, L0_GRADIENT_MIN_LAMDA, \
+    L0_GRADIENT_MIN_BETA_MAX, TRAINING_DATASET, DATASETS_DIR
 
 BATCH_COMPRESSED = 0
 BATCH_TARGET = 1
@@ -15,15 +18,25 @@ BATCH_PAD_MASK = 2
 
 class JPEGDataset(object):
 
-    def __init__(self, dataset_type):
-        if dataset_type == 'train':
-            self.div2k = tfds.load("div2k", shuffle_files=True, data_dir=DATASETS_DIR + "div2k_dataset/", split="train")
-        else:
-            self.div2k = tfds.load("div2k", shuffle_files=True, data_dir=DATASETS_DIR + "div2k_dataset/",
-                                   split="validation")
+    def __init__(self, dataset_type, batch_size):
+        self.batch_size = batch_size
 
-        self.div2k = self.div2k.prefetch(DATASET_PREFETCH)
-        self.ds_iter = iter(self.div2k)
+        if dataset_type == 'train':
+            self.ds = tf.keras.utils.image_dataset_from_directory(directory=TRAINING_DATASET, batch_size=1,
+                                                                  image_size=(31, 31), validation_split=0.2,
+                                                                  subset='training', seed=int(rand.random() * (2 ^ 64)))
+        elif dataset_type == 'validation':
+            self.ds = tf.keras.utils.image_dataset_from_directory(directory=TRAINING_DATASET, batch_size=1,
+                                                                  image_size=(31, 31), validation_split=0.2,
+                                                                  subset='validation',
+                                                                  seed=int(rand.random() * (2 ^ 64)))
+        elif dataset_type == 'test':
+            self.ds = tfds.load('urban100_dataset', data_dir=DATASETS_DIR)['train']
+
+        self.ds = self.ds.prefetch(DATASET_PREFETCH)
+        self.ds_iter = iter(self.ds)
+
+        self.dataset_type = dataset_type
 
         # DEBUG
         self.test = 0
@@ -36,24 +49,28 @@ class JPEGDataset(object):
         compressed_images = []
         i = 0
 
-        '''
         # debug code
-        if self.test >= 10:
+        if self.test >= 1:
             raise StopIteration
-        '''
 
-        for e in range(BATCH_SIZE):
+        for e in range(self.batch_size):
             # add original image to targets
             example = next(self.ds_iter)
             if example is None:
                 raise StopIteration
-            img = np.asarray(example['lr'])
+            if self.dataset_type == 'test':
+                img = np.asarray(example['image'])
+            else:
+                img = np.asarray(example[0][0])
             img = img.astype('float32')
             img = img / 255.0
             target_images.append(img)
 
             # compress image and add to inputs
-            tmp = np.asarray(example['lr'])
+            if self.dataset_type == 'test':
+                tmp = np.asarray(example['image']).astype('uint8')
+            else:
+                tmp = np.asarray(example[0][0]).astype('uint8')
             pil_img = Image.fromarray(tmp)
             buffer = BytesIO()
             pil_img.save(buffer, format="JPEG", quality=JPEG_QUALITY)
@@ -63,7 +80,7 @@ class JPEGDataset(object):
             pil_img = pil_img / 255.0
             compressed_images.append(pil_img)
 
-            if i >= BATCH_SIZE - 1:
+            if i >= self.batch_size - 1:
                 break
 
             i = i + 1

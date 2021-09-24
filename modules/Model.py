@@ -66,7 +66,7 @@ def MPRRN(inputs, rrusPerIrb, irbCount):
     irbs = []
     sums = []
     for i in range(irbCount):
-        if i is 0:
+        if i == 0:
             irbs.append(MPRRN_IRB(conv_1, rrusPerIrb))
             sums.append(Add()([irbs[i], conv_1]))
         else:
@@ -98,7 +98,7 @@ def MPRRN_IRB(inputs, rruCount):
     rrus = []
 
     for i in range(rruCount):
-        if i is 0:
+        if i == 0:
             rrus.append(MPRRN_RRU(inputs))
         else:
             rrus.append(MPRRN_RRU(rrus[i - 1]))

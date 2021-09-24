@@ -6,7 +6,8 @@ import numpy as np
 
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
-    ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY
+    ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
+    SAVE_AND_CONTINUE
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET, preprocessInputsForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
@@ -39,23 +40,30 @@ class TrainNN:
 
     def __init__(self):
         TF_Init()
-        TrainNN.clean_dirs()
-        TrainNN.create_dirs()
-        self.model = Model.modelSwitch[NN_MODEL]
-        self.load_weights()
-
-        # self.trainData = JPEGDataset('train')
-        # self.testData = JPEGDataset('validation')
 
         self.info = NN_MODEL + "_" + str(EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
             LEARNING_RATE)
+        self.saveFile = self.info + ".save"
         self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
         self.lossTrainCsv = "./stats/loss_train_" + self.info + ".csv"
         self.psnrTestCsv = "./stats/psnr_test_" + self.info + ".csv"
         self.lossTestCsv = "./stats/loss_test_" + self.info + ".csv"
+        self.psnrValidationCsv = "./stats/psnr_validation_" + self.info + ".csv"
+        self.lossValidationCsv = "./stats/loss_validation_" + self.info + ".csv"
+
+        self.model = Model.modelSwitch[NN_MODEL]
+
+        self.startingEpoch = 0
+        if not SAVE_AND_CONTINUE:
+            TrainNN.clean_dirs()
+            TrainNN.create_dirs()
+            if LOAD_WEIGHTS:
+                self.load_weights()
+        else:
+            self.continueTraining()
+            self.load_weights()
 
     def train(self):
-        time1 = dt.datetime.now()
         learningRate = LEARNING_RATE
 
         for epoch in range(EPOCHS):
@@ -66,15 +74,17 @@ class TrainNN:
             print("\nEpoch " + str(epoch) + " finished. Starting test step\n")
             self.do_test(epoch)
             self.sample_output_images(epoch)
+            self.saveEpoch(epoch + 1)
 
-        self.save_training_results()
+        # This called in self.saveEpoch() so not needed here
+        # self.save_training_results()
 
     def do_epoch(self, epoch, learningRate):
         optimizer = tf.keras.optimizers.Adam(learning_rate=learningRate, epsilon=ADAM_EPSILON)
         batches = 0
         total_loss = 0.0
         total_psnr = 0.0
-        trainData = JPEGDataset('train')
+        trainData = JPEGDataset('train', BATCH_SIZE)
 
         for batch in trainData:
             structureIn, textureIn = None, None
@@ -120,16 +130,13 @@ class TrainNN:
         lossFile.close()
         psnrFile.close()
 
-        self.do_eval()
+        self.do_validation(epoch)
 
-    def do_eval(self):
-        print("Eval step NYI")
-
-    def do_test(self, epoch):
+    def do_validation(self, epoch):
         total_loss = 0.0
         total_psnr = 0.0
         batches = 0
-        testData = JPEGDataset('validation')
+        testData = JPEGDataset('validation', BATCH_SIZE)
 
         for batch in testData:
             structureIn, textureIn = None, None
@@ -137,7 +144,6 @@ class TrainNN:
                 structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
 
             for c in range(3):
-
                 if NN_MODEL == 'strrn':
                     model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
                 else:
@@ -147,6 +153,42 @@ class TrainNN:
                 psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
                 total_loss += np.average(loss)
                 total_psnr += np.average(psnr)
+
+            batches += 1
+
+        avg_loss = total_loss / batches / 3
+        avg_psnr = total_psnr / batches / 3
+
+        lossFile = open(self.lossValidationCsv, "a")
+        psnrFile = open(self.psnrValidationCsv, "a")
+        lossFile.write(str(epoch) + "," + str(avg_loss) + "\n")
+        psnrFile.write(str(epoch) + "," + str(avg_psnr) + "\n")
+        lossFile.close()
+        psnrFile.close()
+
+    def do_test(self, epoch):
+        total_loss = 0.0
+        total_psnr = 0.0
+        batches = 0
+        testData = JPEGDataset('test', TEST_BATCH_SIZE)
+
+        for batch in testData:
+            structureIn, textureIn = None, None
+            if NN_MODEL == 'strrn':
+                structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
+
+            for c in range(3):
+                # only run with CPU if there's not enough VRAM to run on GPU
+                with tf.device('/CPU:0'):
+                    if NN_MODEL == 'strrn':
+                        model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
+                    else:
+                        model_out = self.model(batch[BATCH_COMPRESSED][..., c:c + 1])
+
+                    loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
+                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+                    total_loss += np.average(loss)
+                    total_psnr += np.average(psnr)
 
             batches += 1
 
@@ -178,13 +220,14 @@ class TrainNN:
 
             channels_out = []
             for c in range(3):
+                # only run with CPU if there's not enough VRAM to run on GPU
+                with tf.device('/CPU:0'):
+                    if NN_MODEL == 'strrn':
+                        model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
+                    else:
+                        model_out = self.model(nn_input[..., c:c + 1])
 
-                if NN_MODEL == 'strrn':
-                    model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
-                else:
-                    model_out = self.model(nn_input[..., c:c + 1])
-
-                channels_out.append(np.asarray(model_out))
+                    channels_out.append(np.asarray(model_out))
 
             arr = np.array(channels_out)
             image_out = np.concatenate(arr, axis=-1)
@@ -201,9 +244,8 @@ class TrainNN:
     def load_weights(self):
         # load model checkpoint if exists
         try:
-            if LOAD_WEIGHTS:
-                self.model.load_weights(CHECKPOINTS_PATH + "/modelCheckpoint_" + self.info)
-                print("Weights loaded")
+            self.model.load_weights(CHECKPOINTS_PATH + "/modelCheckpoint_" + self.info)
+            print("Weights loaded")
         except Exception as e:
             print("Weights not loaded. Will create new weights")
             print(str(e))
@@ -212,10 +254,18 @@ class TrainNN:
         self.model.save_weights(CHECKPOINTS_PATH + "/modelCheckpoint_" + self.info)
 
     def save_training_results(self):
-        os.mkdir("./savedResults/" + self.info)
-        shutil.copytree(src="./checkpoints", dst="./savedResults/" + self.info + "./checkpoints")
-        shutil.copytree(src="./sampleImageOutputs", dst="./savedResults/" + self.info + "./sampleImageOutputs")
-        shutil.copytree(src="./stats", dst="./savedResults/" + self.info + "./stats")
+        if not os.path.exists("./savedResults/" + self.info):
+            os.mkdir("./savedResults/" + self.info)
+        if os.path.exists("./savedResults/" + self.info + "./checkpoints"):
+            shutil.rmtree("./savedResults/" + self.info + "./checkpoints")
+        shutil.copytree(src="./checkpoints", dst="./savedResults/" + self.info + "./checkpoints", dirs_exist_ok=True)
+        if os.path.exists("./savedResults/" + self.info + "./sampleImageOutputs"):
+            shutil.rmtree("./savedResults/" + self.info + "./sampleImageOutputs")
+        shutil.copytree(src="./sampleImageOutputs", dst="./savedResults/" + self.info + "./sampleImageOutputs",
+                        dirs_exist_ok=True)
+        if os.path.exists("./savedResults/" + self.info + "./stats"):
+            shutil.rmtree("./savedResults/" + self.info + "./stats")
+        shutil.copytree(src="./stats", dst="./savedResults/" + self.info + "./stats", dirs_exist_ok=True)
 
     @staticmethod
     def create_dirs():
@@ -234,6 +284,23 @@ class TrainNN:
             shutil.rmtree("sampleImageOutputs")
         except FileNotFoundError:
             print("Nothing to delete here")
+
+    def continueTraining(self):
+        if os.path.exists(self.saveFile):
+            save = open(self.saveFile, 'r')
+            epoch = save.read()
+            self.startingEpoch = int(epoch)
+        else:
+            print("No Save point found. Starting from epoch 0")
+            file = open(self.saveFile, 'w')
+            file.write('0')
+            file.close()
+            self.startingEpoch = 0
+
+    def saveEpoch(self, epoch):
+        save = open(self.saveFile, 'w')
+        save.write(str(epoch))
+        self.save_training_results()
 
 
 trainNn = TrainNN()
