@@ -5,6 +5,7 @@ sampleImageOutputs/**
 savedResults/**
 modules/__pycache__
 L0GradientMin/__pycache__
+*.save
 
 !stats/.gitkeep
 !checkpoints/.gitkeep
