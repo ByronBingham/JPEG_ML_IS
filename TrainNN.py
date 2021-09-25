@@ -7,14 +7,12 @@ import numpy as np
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
-    SAVE_AND_CONTINUE
+    SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET, preprocessInputsForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
 from pathlib import Path
 
-
-# TODO: save model every epoch
 
 def TF_Init():
     tf.compat.v1.enable_control_flow_v2()
@@ -45,11 +43,17 @@ class TrainNN:
             LEARNING_RATE)
         self.saveFile = self.info + ".save"
         self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
-        self.lossTrainCsv = "./stats/loss_train_" + self.info + ".csv"
+        self.ssimTrainCsv = "./stats/loss_train_" + self.info + ".csv"
+        self.lossTrainCsv = "./stats/ssim_train_" + self.info + ".csv"
+        self.accuracyTrainCsv = "./stats/accuracy_train_" + self.info + ".csv"
         self.psnrTestCsv = "./stats/psnr_test_" + self.info + ".csv"
         self.lossTestCsv = "./stats/loss_test_" + self.info + ".csv"
+        self.ssimTestCsv = "./stats/ssim_test_" + self.info + ".csv"
+        self.accuracyTestCsv = "./stats/accuracy_test_" + self.info + ".csv"
         self.psnrValidationCsv = "./stats/psnr_validation_" + self.info + ".csv"
         self.lossValidationCsv = "./stats/loss_validation_" + self.info + ".csv"
+        self.ssimValidationCsv = "./stats/ssim_validation_" + self.info + ".csv"
+        self.accuracyValidationCsv = "./stats/accuracy_Validation_" + self.info + ".csv"
 
         self.model = Model.modelSwitch[NN_MODEL]
 
@@ -84,6 +88,8 @@ class TrainNN:
         batches = 0
         total_loss = 0.0
         total_psnr = 0.0
+        total_ssim = 0.0
+        total_accuracy = 0.0
         trainData = JPEGDataset('train', BATCH_SIZE)
 
         for batch in trainData:
@@ -108,10 +114,14 @@ class TrainNN:
                     model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c + 1])
 
                     loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
-                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out)
+                    ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out)
 
                     total_loss += np.average(loss)
                     total_psnr += np.average(psnr)
+                    total_ssim += np.average(ssim)
+                    if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
+                        total_accuracy += 1
 
                     gradients = tape.gradient(loss, self.model.trainable_variables)
                     gradients = [tf.clip_by_norm(g, GRAD_NORM) for g in gradients]
@@ -122,19 +132,29 @@ class TrainNN:
 
         avg_loss = total_loss / batches / 3
         avg_psnr = total_psnr / batches / 3
+        avg_ssim = total_ssim / batches / 3
+        avg_accuracy = total_accuracy / batches / 3
 
         lossFile = open(self.lossTrainCsv, "a")
         psnrFile = open(self.psnrTrainCsv, "a")
+        ssimFile = open(self.ssimTrainCsv, "a")
+        accuracyFile = open(self.accuracyTrainCsv, "a")
         lossFile.write(str(epoch) + "," + str(avg_loss) + "\n")
         psnrFile.write(str(epoch) + "," + str(avg_psnr) + "\n")
+        ssimFile.write(str(epoch) + "," + str(avg_ssim) + "\n")
+        accuracyFile.write(str(epoch) + "," + str(avg_accuracy) + "\n")
         lossFile.close()
         psnrFile.close()
+        ssimFile.close()
+        accuracyFile.close()
 
         self.do_validation(epoch)
 
     def do_validation(self, epoch):
         total_loss = 0.0
         total_psnr = 0.0
+        total_ssim = 0.0
+        total_accuracy = 0.0
         batches = 0
         testData = JPEGDataset('validation', BATCH_SIZE)
 
@@ -151,24 +171,39 @@ class TrainNN:
 
                 loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
                 psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+                ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out)
+
                 total_loss += np.average(loss)
                 total_psnr += np.average(psnr)
+                total_ssim += np.average(ssim)
+                if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
+                    total_accuracy += 1
 
             batches += 1
 
         avg_loss = total_loss / batches / 3
         avg_psnr = total_psnr / batches / 3
+        avg_ssim = total_ssim / batches / 3
+        avg_accuracy = total_accuracy / batches / 3
 
         lossFile = open(self.lossValidationCsv, "a")
         psnrFile = open(self.psnrValidationCsv, "a")
+        ssimFile = open(self.ssimValidationCsv, "a")
+        accuracyFile = open(self.accuracyValidationCsv, "a")
         lossFile.write(str(epoch) + "," + str(avg_loss) + "\n")
         psnrFile.write(str(epoch) + "," + str(avg_psnr) + "\n")
+        ssimFile.write(str(epoch) + "," + str(avg_ssim) + "\n")
+        accuracyFile.write(str(epoch) + "," + str(avg_accuracy) + "\n")
         lossFile.close()
         psnrFile.close()
+        ssimFile.close()
+        accuracyFile.close()
 
     def do_test(self, epoch):
         total_loss = 0.0
         total_psnr = 0.0
+        total_ssim = 0.0
+        total_accuracy = 0.0
         batches = 0
         testData = JPEGDataset('test', TEST_BATCH_SIZE)
 
@@ -187,20 +222,33 @@ class TrainNN:
 
                     loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
                     psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+                    ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out)
+
                     total_loss += np.average(loss)
                     total_psnr += np.average(psnr)
+                    total_ssim += np.average(ssim)
+                    if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
+                        total_accuracy += 1
 
             batches += 1
 
         avg_loss = total_loss / batches / 3
         avg_psnr = total_psnr / batches / 3
+        avg_ssim = total_ssim / batches / 3
+        avg_accuracy = total_accuracy / batches / 3
 
         lossFile = open(self.lossTestCsv, "a")
         psnrFile = open(self.psnrTestCsv, "a")
+        ssimFile = open(self.ssimTestCsv, "a")
+        accuracyFile = open(self.accuracyTestCsv, "a")
         lossFile.write(str(epoch) + "," + str(avg_loss) + "\n")
         psnrFile.write(str(epoch) + "," + str(avg_psnr) + "\n")
+        ssimFile.write(str(epoch) + "," + str(avg_ssim) + "\n")
+        accuracyFile.write(str(epoch) + "," + str(avg_accuracy) + "\n")
         lossFile.close()
         psnrFile.close()
+        ssimFile.close()
+        accuracyFile.close()
 
     @staticmethod
     def sample_compress():
