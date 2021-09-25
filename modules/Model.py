@@ -107,7 +107,7 @@ def MPRRN_IRB(inputs, rruCount):
 
 
 modelSwitch = {
-    'eqlri': EQLRI_model(),
-    'kerasexample': kerasExample_model(),
-    'strrn': STRRN()
+    'eqlri': EQLRI_model,
+    'kerasexample': kerasExample_model,
+    'strrn': STRRN
 }

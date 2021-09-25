@@ -1,14 +1,13 @@
 import os
 import shutil
 import tensorflow as tf
-import datetime as dt
 import numpy as np
 
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS
-from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET, preprocessInputsForSTRRN
+from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessInputsForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
 from pathlib import Path
@@ -32,7 +31,7 @@ def TF_Init():
 
 
 class TrainNN:
-    model = None
+    models = None
     trainData = None
     testData = None
 
@@ -61,7 +60,8 @@ class TrainNN:
         self.ssimValidationCsv = "./stats/ssim_validation_" + self.info + ".csv"
         self.accuracyValidationCsv = "./stats/accuracy_Validation_" + self.info + ".csv"
 
-        self.model = Model.modelSwitch[NN_MODEL]
+        self.models = [Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL]()]
+        self.models = np.asarray(self.models)
 
         self.startingEpoch = 0
         if not SAVE_AND_CONTINUE:
@@ -101,11 +101,11 @@ class TrainNN:
                 structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
             for c in range(3):  # do separate training pass for each RGB channel
                 with tf.GradientTape() as tape:
-                    tape.watch(self.model.trainable_variables)
+                    tape.watch(self.models[c].trainable_variables)
                     if NN_MODEL == 'strrn':
-                        model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]], training=True)
+                        model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]], training=True)
                     else:
-                        model_out = self.model(batch[BATCH_COMPRESSED][..., c:c + 1], training=True)
+                        model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1], training=True)
 
                     # DEBUG
                     # self.saveNNOutput(model_out, "NN_Output.png")
@@ -126,9 +126,9 @@ class TrainNN:
                     if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
                         total_accuracy += 1
 
-                    gradients = tape.gradient(loss, self.model.trainable_variables)
+                    gradients = tape.gradient(loss, self.models[c].trainable_variables)
                     gradients = [tf.clip_by_norm(g, GRAD_NORM) for g in gradients]
-                    optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+                    optimizer.apply_gradients(zip(gradients, self.models[c].trainable_variables))
 
             print("Batch " + str(batches + 1) + " Complete")
             batches = batches + 1
@@ -168,9 +168,9 @@ class TrainNN:
 
             for c in range(3):
                 if NN_MODEL == 'strrn':
-                    model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
+                    model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
                 else:
-                    model_out = self.model(batch[BATCH_COMPRESSED][..., c:c + 1])
+                    model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1])
 
                 loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
                 psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
@@ -217,9 +217,9 @@ class TrainNN:
 
             for c in range(3):
                 if NN_MODEL == 'strrn':
-                    model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
+                    model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
                 else:
-                    model_out = self.model(batch[BATCH_COMPRESSED][..., c:c + 1])
+                    model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1])
 
                 loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
                 psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
@@ -270,9 +270,9 @@ class TrainNN:
             channels_out = []
             for c in range(3):
                 if NN_MODEL == 'strrn':
-                    model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
+                    model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
                 else:
-                    model_out = self.model(nn_input[..., c:c + 1])
+                    model_out = self.models[c](nn_input[..., c:c + 1])
 
                 channels_out.append(np.asarray(model_out))
 
@@ -291,13 +291,15 @@ class TrainNN:
     def load_weights(self):
         # load model checkpoint if exists
         try:
-            self.model.load_weights(CHECKPOINTS_PATH + "modelCheckpoint_" + self.info)
+            for c in range(3):
+                self.models[c].load_weights(CHECKPOINTS_PATH + "modelCheckpoint_ch" + str(c) + "_" + self.info)
             print("Weights loaded")
         except Exception as e:
             print("Weights not loaded. Will create new weights")
 
     def save_weights(self):
-        self.model.save_weights(CHECKPOINTS_PATH + "/modelCheckpoint_" + self.info)
+        for c in range(3):
+            self.models[c].save_weights(CHECKPOINTS_PATH + "modelCheckpoint_ch" + str(c) + "_" + self.info)
 
     def save_training_results(self):
         if not os.path.exists("./savedResults/" + self.info):
