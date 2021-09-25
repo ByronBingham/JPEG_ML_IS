@@ -86,9 +86,6 @@ class TrainNN:
             self.sample_output_images(epoch)
             self.saveEpoch(epoch + 1)
 
-        # This called in self.saveEpoch() so not needed here
-        # self.save_training_results()
-
     def do_epoch(self, epoch, learningRate):
         optimizer = tf.keras.optimizers.Adam(learning_rate=learningRate, epsilon=ADAM_EPSILON)
         batches = 0
@@ -257,12 +254,12 @@ class TrainNN:
     @staticmethod
     def sample_compress():
         for file in SAMPLE_IMAGES:
-            pil_img = Image.open(file + ".png")
-            pil_img.save(file + ".png" + ".compressed.jpg", format="JPEG", quality=JPEG_QUALITY)
+            pil_img = Image.open("./sampleImages" + file + ".png")
+            pil_img.save("./sampleImages" + file + ".png" + ".compressed.jpg", format="JPEG", quality=JPEG_QUALITY)
 
     def sample_output_images(self, epoch):
         for file in SAMPLE_IMAGES:
-            pil_img = Image.open(file + ".png" + ".compressed.jpg")
+            pil_img = Image.open("./sampleImages" + file + ".png" + ".compressed.jpg")
             nn_input = np.array(pil_img, dtype='float32') / 255.0
             nn_input = np.expand_dims(nn_input, axis=0)
 
