@@ -7,7 +7,7 @@ import numpy as np
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
-    SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD
+    SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_PAD_MASK, BATCH_TARGET, preprocessInputsForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
@@ -39,8 +39,14 @@ class TrainNN:
     def __init__(self):
         TF_Init()
 
-        self.info = NN_MODEL + "_" + str(EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
-            LEARNING_RATE)
+        if NN_MODEL == 'strrn':
+            self.info = NN_MODEL + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(MPRRN_IRBS) + "_" + str(
+                EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
+                LEARNING_RATE)
+        else:
+            self.info = NN_MODEL + "_" + str(EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
+                LEARNING_RATE)
+
         self.saveFile = self.info + ".save"
         self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
         self.ssimTrainCsv = "./stats/loss_train_" + self.info + ".csv"
@@ -114,8 +120,8 @@ class TrainNN:
                     model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c + 1])
 
                     loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
-                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out)
-                    ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out)
+                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+                    ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
 
                     total_loss += np.average(loss)
                     total_psnr += np.average(psnr)
@@ -171,7 +177,7 @@ class TrainNN:
 
                 loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
                 psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
-                ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out)
+                ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
 
                 total_loss += np.average(loss)
                 total_psnr += np.average(psnr)
@@ -213,22 +219,20 @@ class TrainNN:
                 structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
 
             for c in range(3):
-                # only run with CPU if there's not enough VRAM to run on GPU
-                with tf.device('/CPU:0'):
-                    if NN_MODEL == 'strrn':
-                        model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
-                    else:
-                        model_out = self.model(batch[BATCH_COMPRESSED][..., c:c + 1])
+                if NN_MODEL == 'strrn':
+                    model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
+                else:
+                    model_out = self.model(batch[BATCH_COMPRESSED][..., c:c + 1])
 
-                    loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
-                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
-                    ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out)
+                loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
+                psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+                ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
 
-                    total_loss += np.average(loss)
-                    total_psnr += np.average(psnr)
-                    total_ssim += np.average(ssim)
-                    if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
-                        total_accuracy += 1
+                total_loss += np.average(loss)
+                total_psnr += np.average(psnr)
+                total_ssim += np.average(ssim)
+                if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
+                    total_accuracy += 1
 
             batches += 1
 
@@ -268,14 +272,12 @@ class TrainNN:
 
             channels_out = []
             for c in range(3):
-                # only run with CPU if there's not enough VRAM to run on GPU
-                with tf.device('/CPU:0'):
-                    if NN_MODEL == 'strrn':
-                        model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
-                    else:
-                        model_out = self.model(nn_input[..., c:c + 1])
+                if NN_MODEL == 'strrn':
+                    model_out = self.model([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
+                else:
+                    model_out = self.model(nn_input[..., c:c + 1])
 
-                    channels_out.append(np.asarray(model_out))
+                channels_out.append(np.asarray(model_out))
 
             arr = np.array(channels_out)
             image_out = np.concatenate(arr, axis=-1)
@@ -292,11 +294,10 @@ class TrainNN:
     def load_weights(self):
         # load model checkpoint if exists
         try:
-            self.model.load_weights(CHECKPOINTS_PATH + "/modelCheckpoint_" + self.info)
+            self.model.load_weights(CHECKPOINTS_PATH + "modelCheckpoint_" + self.info)
             print("Weights loaded")
         except Exception as e:
             print("Weights not loaded. Will create new weights")
-            print(str(e))
 
     def save_weights(self):
         self.model.save_weights(CHECKPOINTS_PATH + "/modelCheckpoint_" + self.info)

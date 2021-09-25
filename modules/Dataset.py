@@ -49,9 +49,11 @@ class JPEGDataset(object):
         compressed_images = []
         i = 0
 
+        '''
         # debug code
-        if self.test >= 1:
+        if self.test >= 10:
             raise StopIteration
+        '''
 
         for e in range(self.batch_size):
             # add original image to targets
