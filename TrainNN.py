@@ -114,7 +114,7 @@ class TrainNN:
                     # DEBUG
 
                     # multiply output by the padding mask to make sure padded areas are 0
-                    model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c + 1])
+                    # model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c + 1])
 
                     loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
                     psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
@@ -254,12 +254,12 @@ class TrainNN:
     @staticmethod
     def sample_compress():
         for file in SAMPLE_IMAGES:
-            pil_img = Image.open("./sampleImages" + file + ".png")
-            pil_img.save("./sampleImages" + file + ".png" + ".compressed.jpg", format="JPEG", quality=JPEG_QUALITY)
+            pil_img = Image.open("./sampleImages/" + file + ".png")
+            pil_img.save("./sampleImages/" + file + ".png" + ".compressed.jpg", format="JPEG", quality=JPEG_QUALITY)
 
     def sample_output_images(self, epoch):
         for file in SAMPLE_IMAGES:
-            pil_img = Image.open("./sampleImages" + file + ".png" + ".compressed.jpg")
+            pil_img = Image.open("./sampleImages/" + file + ".png" + ".compressed.jpg")
             nn_input = np.array(pil_img, dtype='float32') / 255.0
             nn_input = np.expand_dims(nn_input, axis=0)
 

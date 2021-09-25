@@ -22,8 +22,8 @@ TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
 GRAD_NORM = 1.0  # max value for gradients. Clipping gradients to prevent NaN issues
 ADAM_EPSILON = 0.001
 ACCURACY_PSNR_THRESHOLD = 26.95
-SAMPLE_IMAGES = ["./sampleCartoonImage", "./samplePhotoImage",
-                 "./sampleUrban100"]
+SAMPLE_IMAGES = ["sampleCartoonImage", "samplePhotoImage",
+                 "sampleUrban100"]
 CHECKPOINTS_PATH = "./checkpoints/"
 DATASETS_DIR = "e:/datasets"
 TRAINING_DATASET = "e:/datasets/div2k_dataset/preprocessed/"
