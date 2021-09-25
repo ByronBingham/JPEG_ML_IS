@@ -39,11 +39,12 @@ class TrainNN:
         TF_Init()
 
         if NN_MODEL == 'strrn':
-            self.info = NN_MODEL + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(MPRRN_IRBS) + "_" + str(
-                EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
+            self.info = NN_MODEL + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(MPRRN_IRBS) + "_QL" + str(
+                JPEG_QUALITY) + "_" + str(EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
                 LEARNING_RATE)
         else:
-            self.info = NN_MODEL + "_" + str(EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
+            self.info = NN_MODEL + "_QL" + str(JPEG_QUALITY) + "_" + str(EPOCHS) + "epochs_batchSize" + str(
+                BATCH_SIZE) + "_learningRate" + str(
                 LEARNING_RATE)
 
         self.saveFile = self.info + ".save"
@@ -76,7 +77,7 @@ class TrainNN:
     def train(self):
         learningRate = LEARNING_RATE
 
-        for epoch in range(EPOCHS):
+        for epoch in range(self.startingEpoch, EPOCHS):
             if epoch % LEARNING_RATE_DECAY_INTERVAL == 0:
                 learningRate = learningRate / LEARNING_RATE_DECAY
             self.do_epoch(epoch, learningRate)
@@ -99,6 +100,11 @@ class TrainNN:
             structureIn, textureIn = None, None
             if NN_MODEL == 'strrn':
                 structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
+
+            # DEBUG
+            # channels_out = []
+            # DEBUG
+
             for c in range(3):  # do separate training pass for each RGB channel
                 with tf.GradientTape() as tape:
                     tape.watch(self.models[c].trainable_variables)
@@ -107,14 +113,12 @@ class TrainNN:
                     else:
                         model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1], training=True)
 
-                    # DEBUG
-                    # self.saveNNOutput(model_out, "NN_Output.png")
-                    # self.saveNNOutput(batch[BATCH_COMPRESSED], "This_should_be_NN_input.png")
-                    # self.saveNNOutput(batch[BATCH_TARGET], "This_should_be_target_data.png")
-                    # DEBUG
-
                     # multiply output by the padding mask to make sure padded areas are 0
                     # model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c + 1])
+
+                    # DEBUG
+                    # channels_out.append(np.asarray(model_out))
+                    # DEBUG
 
                     loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
                     psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
@@ -129,6 +133,17 @@ class TrainNN:
                     gradients = tape.gradient(loss, self.models[c].trainable_variables)
                     gradients = [tf.clip_by_norm(g, GRAD_NORM) for g in gradients]
                     optimizer.apply_gradients(zip(gradients, self.models[c].trainable_variables))
+
+            '''
+            # DEBUG
+            arr = np.array(channels_out)
+            image_out = np.concatenate(arr, axis=-1)
+
+            self.saveNNOutput(image_out, "NN_Output.png")
+            self.saveNNOutput(batch[BATCH_COMPRESSED], "This_should_be_NN_input.png")
+            self.saveNNOutput(batch[BATCH_TARGET], "This_should_be_target_data.png")
+            # DEBUG
+            '''
 
             print("Batch " + str(batches + 1) + " Complete")
             batches = batches + 1
@@ -283,6 +298,7 @@ class TrainNN:
 
     @staticmethod
     def saveNNOutput(output, file):
+        output = np.clip(output, a_min=0.0, a_max=1.0)
         output = output * 255.0
         output = np.array(output).astype('uint8')
         out_img = Image.fromarray(output[0])

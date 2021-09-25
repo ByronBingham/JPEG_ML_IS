@@ -51,7 +51,7 @@ class JPEGDataset(object):
 
         '''
         # debug code
-        if self.test >= 10:
+        if self.test >= 1:
             raise StopIteration
         '''
 

@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, ReLU, Add
+from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, ReLU, Add, Activation
 from modules.NNConfig import INPUT_SHAPE, MPRRN_FILTERS_PER_LAYER, MPRRN_FILTER_SHAPE, MPRRN_RRU_PER_IRB, MPRRN_IRBS
 
 
@@ -55,6 +55,8 @@ def STRRN():
 
     aggregator = MPRRN(aggregator_input, rrusPerIrb=1, irbCount=1)
 
+    # output = Activation(activation=tf.keras.activations.sigmoid)(aggregator)
+
     model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=aggregator)
 
     return model
@@ -63,45 +65,48 @@ def STRRN():
 def MPRRN(inputs, rrusPerIrb, irbCount):
     conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(inputs)
 
+    conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+    conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+
     irbs = []
     sums = []
     for i in range(irbCount):
         if i == 0:
-            irbs.append(MPRRN_IRB(conv_1, rrusPerIrb))
+            irbs.append(MPRRN_IRB(conv_1, rrusPerIrb, conv_2, conv_3))
             sums.append(Add()([irbs[i], conv_1]))
         else:
-            irbs.append(MPRRN_IRB(sums[i - 1], rrusPerIrb))
+            irbs.append(MPRRN_IRB(sums[i - 1], rrusPerIrb, conv_2, conv_3))
             sums.append(Add()([irbs[i], conv_1]))
 
-    conv_2 = Conv2D(filters=INPUT_SHAPE[-1], kernel_size=MPRRN_FILTER_SHAPE, padding='same')(sums[-1])
+    conv_4 = Conv2D(filters=INPUT_SHAPE[-1], kernel_size=MPRRN_FILTER_SHAPE, padding='same')(sums[-1])
 
-    out = Add()([inputs, conv_2])
+    out = Add()([inputs, conv_4])
 
     return out
 
 
-def MPRRN_RRU(inputs):
+def MPRRN_RRU(inputs, conv_in_1, conv_in_2):
     bn_1 = BatchNormalization()(inputs)
     relu_1 = ReLU()(bn_1)
-    conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(relu_1)
+    conv_1 = conv_in_1(relu_1)
 
     bn_2 = BatchNormalization()(conv_1)
     relu_2 = ReLU()(bn_2)
-    conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(relu_2)
+    conv_2 = conv_in_2(relu_2)
 
     sum = Add()([conv_2, inputs])
 
     return sum
 
 
-def MPRRN_IRB(inputs, rruCount):
+def MPRRN_IRB(inputs, rruCount, conv_in_1, conv_in_2):
     rrus = []
 
     for i in range(rruCount):
         if i == 0:
-            rrus.append(MPRRN_RRU(inputs))
+            rrus.append(MPRRN_RRU(inputs, conv_in_1, conv_in_2))
         else:
-            rrus.append(MPRRN_RRU(rrus[i - 1]))
+            rrus.append(MPRRN_RRU(rrus[i - 1], conv_in_1, conv_in_2))
 
     return rrus[-1]
 
