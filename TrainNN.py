@@ -318,18 +318,18 @@ class TrainNN:
             self.models[c].save_weights(CHECKPOINTS_PATH + "modelCheckpoint_ch" + str(c) + "_" + self.info)
 
     def save_training_results(self):
-        if not os.path.exists("./savedResults/" + self.info):
-            os.mkdir("./savedResults/" + self.info)
-        if os.path.exists("./savedResults/" + self.info + "./checkpoints"):
-            shutil.rmtree("./savedResults/" + self.info + "./checkpoints")
-        shutil.copytree(src="./checkpoints", dst="./savedResults/" + self.info + "./checkpoints")
-        if os.path.exists("./savedResults/" + self.info + "./sampleImageOutputs"):
-            shutil.rmtree("./savedResults/" + self.info + "./sampleImageOutputs")
-        shutil.copytree(src="./sampleImageOutputs", dst="./savedResults/" + self.info + "./sampleImageOutputs",
+        if not os.path.exists("../savedResults/" + self.info):
+            os.mkdir("../savedResults/" + self.info)
+        if os.path.exists("../savedResults/" + self.info + "./checkpoints"):
+            shutil.rmtree("../savedResults/" + self.info + "./checkpoints")
+        shutil.copytree(src="./checkpoints", dst="../savedResults/" + self.info + "./checkpoints")
+        if os.path.exists("../savedResults/" + self.info + "./sampleImageOutputs"):
+            shutil.rmtree("../savedResults/" + self.info + "./sampleImageOutputs")
+        shutil.copytree(src="./sampleImageOutputs", dst="../savedResults/" + self.info + "./sampleImageOutputs",
                         dirs_exist_ok=True)
-        if os.path.exists("./savedResults/" + self.info + "./stats"):
-            shutil.rmtree("./savedResults/" + self.info + "./stats")
-        shutil.copytree(src="./stats", dst="./savedResults/" + self.info + "./stats")
+        if os.path.exists("../savedResults/" + self.info + "./stats"):
+            shutil.rmtree("../savedResults/" + self.info + "./stats")
+        shutil.copytree(src="./stats", dst="../savedResults/" + self.info + "./stats")
 
     @staticmethod
     def create_dirs():
