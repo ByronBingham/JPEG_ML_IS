@@ -6,7 +6,7 @@ import numpy as np
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
-    SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS
+    SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessInputsForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
@@ -39,8 +39,8 @@ class TrainNN:
         TF_Init()
 
         if NN_MODEL == 'strrn':
-            self.info = NN_MODEL + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(MPRRN_IRBS) + "_QL" + str(
-                JPEG_QUALITY) + "_" + str(EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
+            self.info = NN_MODEL + "(sigmoid)" + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(MPRRN_IRBS) + "_QL" + str(
+                JPEG_QUALITY) + "_L0Lmb" + str(L0_GRADIENT_MIN_LAMDA) + "_" + str(EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
                 LEARNING_RATE)
         else:
             self.info = NN_MODEL + "_QL" + str(JPEG_QUALITY) + "_" + str(EPOCHS) + "epochs_batchSize" + str(
@@ -78,8 +78,8 @@ class TrainNN:
         learningRate = LEARNING_RATE
 
         for epoch in range(self.startingEpoch, EPOCHS):
-            if epoch % LEARNING_RATE_DECAY_INTERVAL == 0:
-                learningRate = learningRate / LEARNING_RATE_DECAY
+            # if epoch % LEARNING_RATE_DECAY_INTERVAL == 0:
+            #    learningRate = learningRate / LEARNING_RATE_DECAY
             self.do_epoch(epoch, learningRate)
             self.save_weights()
             print("\nEpoch " + str(epoch) + " finished. Starting test step\n")
@@ -322,14 +322,14 @@ class TrainNN:
             os.mkdir("./savedResults/" + self.info)
         if os.path.exists("./savedResults/" + self.info + "./checkpoints"):
             shutil.rmtree("./savedResults/" + self.info + "./checkpoints")
-        shutil.copytree(src="./checkpoints", dst="./savedResults/" + self.info + "./checkpoints", dirs_exist_ok=True)
+        shutil.copytree(src="./checkpoints", dst="./savedResults/" + self.info + "./checkpoints")
         if os.path.exists("./savedResults/" + self.info + "./sampleImageOutputs"):
             shutil.rmtree("./savedResults/" + self.info + "./sampleImageOutputs")
         shutil.copytree(src="./sampleImageOutputs", dst="./savedResults/" + self.info + "./sampleImageOutputs",
                         dirs_exist_ok=True)
         if os.path.exists("./savedResults/" + self.info + "./stats"):
             shutil.rmtree("./savedResults/" + self.info + "./stats")
-        shutil.copytree(src="./stats", dst="./savedResults/" + self.info + "./stats", dirs_exist_ok=True)
+        shutil.copytree(src="./stats", dst="./savedResults/" + self.info + "./stats")
 
     @staticmethod
     def create_dirs():

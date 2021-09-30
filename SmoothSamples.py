@@ -1,0 +1,17 @@
+import numpy as np
+
+from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
+from modules.NNConfig import SAMPLE_IMAGES, L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX
+from PIL import Image
+
+for file in SAMPLE_IMAGES:
+    pil_img = Image.open("./sampleImages/" + file + ".png" + ".compressed.jpg")
+    pil_img = np.asarray(pil_img)
+    pil_img = pil_img / 255.0
+    smoothed_img = l0_gradient_minimization_2d(pil_img, lmd=L0_GRADIENT_MIN_LAMDA,
+                                               beta_max=L0_GRADIENT_MIN_BETA_MAX)
+
+    smoothed_img = smoothed_img * 255.0
+    smoothed_img = smoothed_img.astype('uint8')
+    out = Image.fromarray(smoothed_img)
+    out.save("./sampleImages/" + file + ".png" + ".smoothed.png", format="PNG")

@@ -55,9 +55,9 @@ def STRRN():
 
     aggregator = MPRRN(aggregator_input, rrusPerIrb=1, irbCount=1)
 
-    # output = Activation(activation=tf.keras.activations.sigmoid)(aggregator)
+    output = Activation(activation=tf.keras.activations.sigmoid)(aggregator)
 
-    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=aggregator)
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=output)
 
     return model
 

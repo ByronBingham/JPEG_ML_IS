@@ -16,7 +16,7 @@ elif JPEG_QUALITY == 40:
     L0_GRADIENT_MIN_LAMDA = 0.005
 else:
     L0_GRADIENT_MIN_LAMDA = 0.005
-L0_GRADIENT_MIN_BETA_MAX = 0.00001
+L0_GRADIENT_MIN_BETA_MAX = 10000
 
 # Train config
 LOAD_WEIGHTS = False
@@ -26,7 +26,7 @@ LEARNING_RATE = 0.001
 LEARNING_RATE_DECAY_INTERVAL = 8
 LEARNING_RATE_DECAY = 10
 DATASET_PREFETCH = 3000
-BATCH_SIZE = 1024
+BATCH_SIZE = 32
 TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
 GRAD_NORM = 1.0  # max value for gradients. Clipping gradients to prevent NaN issues
 ADAM_EPSILON = 0.001
