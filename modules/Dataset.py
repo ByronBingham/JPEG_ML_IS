@@ -9,7 +9,8 @@ from io import BytesIO
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 
 from modules.NNConfig import DATASET_PREFETCH, JPEG_QUALITY, L0_GRADIENT_MIN_LAMDA, \
-    L0_GRADIENT_MIN_BETA_MAX, TRAINING_DATASET, DATASETS_DIR
+    L0_GRADIENT_MIN_BETA_MAX, TRAINING_DATASET, DATASETS_DIR, DATASET_EARLY_STOP, TRAIN_EARLY_STOP, \
+    VALIDATION_EARLY_STOP, TEST_EARLY_STOP
 
 BATCH_COMPRESSED = 0
 BATCH_TARGET = 1
@@ -39,7 +40,7 @@ class JPEGDataset(object):
         self.dataset_type = dataset_type
 
         # DEBUG
-        self.test = 0
+        self.examples = 0
 
     def __iter__(self):
         return self
@@ -49,11 +50,16 @@ class JPEGDataset(object):
         compressed_images = []
         i = 0
 
-        '''
-        # debug code
-        if self.test >= 1:
-            raise StopIteration
-        '''
+        if DATASET_EARLY_STOP:
+            if self.dataset_type == 'train':
+                if self.examples >= TRAIN_EARLY_STOP:
+                    raise StopIteration
+            if self.dataset_type == 'validation':
+                if self.examples >= VALIDATION_EARLY_STOP:
+                    raise StopIteration
+            if self.dataset_type == 'test':
+                if self.examples >= TEST_EARLY_STOP:
+                    raise StopIteration
 
         for e in range(self.batch_size):
             # add original image to targets
@@ -127,7 +133,7 @@ class JPEGDataset(object):
         pad_mask = np.asarray(pad_mask)
 
         # DEBUG
-        self.test += 1
+        self.examples += 1
         return compressed_images, target_images, pad_mask
 
 

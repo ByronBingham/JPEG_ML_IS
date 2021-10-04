@@ -6,7 +6,8 @@ import numpy as np
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
-    SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA
+    SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
+    DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessInputsForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
@@ -39,13 +40,18 @@ class TrainNN:
         TF_Init()
 
         if NN_MODEL == 'strrn':
-            self.info = NN_MODEL + "(sigmoid)" + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(MPRRN_IRBS) + "_QL" + str(
-                JPEG_QUALITY) + "_L0Lmb" + str(L0_GRADIENT_MIN_LAMDA) + "_" + str(EPOCHS) + "epochs_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
+            self.info = NN_MODEL + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(
+                MPRRN_IRBS) + "_QL" + str(
+                JPEG_QUALITY) + "_L0Lmb" + str(L0_GRADIENT_MIN_LAMDA) + "_" + str(EPOCHS) + "epochs_batchSize" + str(
+                BATCH_SIZE) + "_learningRate" + str(
                 LEARNING_RATE)
         else:
             self.info = NN_MODEL + "_QL" + str(JPEG_QUALITY) + "_" + str(EPOCHS) + "epochs_batchSize" + str(
                 BATCH_SIZE) + "_learningRate" + str(
                 LEARNING_RATE)
+
+        if DATASET_EARLY_STOP:
+            self.info = "minirun_" + self.info
 
         self.saveFile = self.info + ".save"
         self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
@@ -65,6 +71,8 @@ class TrainNN:
         self.models = np.asarray(self.models)
 
         self.startingEpoch = 0
+        self.best_psnr = 0.0
+
         if not SAVE_AND_CONTINUE:
             TrainNN.clean_dirs()
             TrainNN.create_dirs()
@@ -98,7 +106,7 @@ class TrainNN:
 
         for batch in trainData:
             structureIn, textureIn = None, None
-            if NN_MODEL == 'strrn':
+            if NN_MODEL in DUAL_CHANNEL_MODELS:
                 structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
 
             # DEBUG
@@ -108,7 +116,7 @@ class TrainNN:
             for c in range(3):  # do separate training pass for each RGB channel
                 with tf.GradientTape() as tape:
                     tape.watch(self.models[c].trainable_variables)
-                    if NN_MODEL == 'strrn':
+                    if NN_MODEL in DUAL_CHANNEL_MODELS:
                         model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]], training=True)
                     else:
                         model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1], training=True)
@@ -178,11 +186,11 @@ class TrainNN:
 
         for batch in testData:
             structureIn, textureIn = None, None
-            if NN_MODEL == 'strrn':
+            if NN_MODEL in DUAL_CHANNEL_MODELS:
                 structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
 
             for c in range(3):
-                if NN_MODEL == 'strrn':
+                if NN_MODEL in DUAL_CHANNEL_MODELS:
                     model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
                 else:
                     model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1])
@@ -227,11 +235,11 @@ class TrainNN:
 
         for batch in testData:
             structureIn, textureIn = None, None
-            if NN_MODEL == 'strrn':
+            if NN_MODEL in DUAL_CHANNEL_MODELS:
                 structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
 
             for c in range(3):
-                if NN_MODEL == 'strrn':
+                if NN_MODEL in DUAL_CHANNEL_MODELS:
                     model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
                 else:
                     model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1])
@@ -266,6 +274,13 @@ class TrainNN:
         ssimFile.close()
         accuracyFile.close()
 
+        # save weights if this is the best psnr performance
+        if avg_psnr > self.best_psnr:
+            if os.path.exists(CHECKPOINTS_PATH + "best/"):
+                shutil.rmtree(CHECKPOINTS_PATH + "best/")
+            shutil.copytree(src=CHECKPOINTS_PATH, dst=CHECKPOINTS_PATH + "best/")
+            self.best_psnr = avg_psnr
+
     @staticmethod
     def sample_compress():
         for file in SAMPLE_IMAGES:
@@ -279,7 +294,7 @@ class TrainNN:
             nn_input = np.expand_dims(nn_input, axis=0)
 
             structureIn, textureIn = None, None
-            if NN_MODEL == 'strrn':
+            if NN_MODEL in DUAL_CHANNEL_MODELS:
                 structureIn, textureIn = preprocessInputsForSTRRN(np.asarray(nn_input))
 
             channels_out = []
@@ -312,12 +327,15 @@ class TrainNN:
             print("Weights loaded")
         except Exception as e:
             print("Weights not loaded. Will create new weights")
+            self.clean_dirs()
 
     def save_weights(self):
         for c in range(3):
             self.models[c].save_weights(CHECKPOINTS_PATH + "modelCheckpoint_ch" + str(c) + "_" + self.info)
 
     def save_training_results(self):
+        if not os.path.exists("../savedResults/"):
+            os.mkdir("../savedResults/")
         if not os.path.exists("../savedResults/" + self.info):
             os.mkdir("../savedResults/" + self.info)
         if os.path.exists("../savedResults/" + self.info + "./checkpoints"):
@@ -325,8 +343,7 @@ class TrainNN:
         shutil.copytree(src="./checkpoints", dst="../savedResults/" + self.info + "./checkpoints")
         if os.path.exists("../savedResults/" + self.info + "./sampleImageOutputs"):
             shutil.rmtree("../savedResults/" + self.info + "./sampleImageOutputs")
-        shutil.copytree(src="./sampleImageOutputs", dst="../savedResults/" + self.info + "./sampleImageOutputs",
-                        dirs_exist_ok=True)
+        shutil.copytree(src="./sampleImageOutputs", dst="../savedResults/" + self.info + "./sampleImageOutputs")
         if os.path.exists("../savedResults/" + self.info + "./stats"):
             shutil.rmtree("../savedResults/" + self.info + "./stats")
         shutil.copytree(src="./stats", dst="../savedResults/" + self.info + "./stats")
@@ -344,26 +361,35 @@ class TrainNN:
     def clean_dirs():
         try:
             shutil.rmtree("stats")
+            os.mkdir("stats")
             shutil.rmtree("checkpoints")
+            os.mkdir("checkpoints")
             shutil.rmtree("sampleImageOutputs")
+            os.mkdir("sampleImageOutputs")
         except FileNotFoundError:
             print("Nothing to delete here")
 
     def continueTraining(self):
         if os.path.exists(self.saveFile):
             save = open(self.saveFile, 'r')
-            epoch = save.read()
+            epoch = save.readline()
+            best_psnr = save.readline()
+            save.close()
             self.startingEpoch = int(epoch)
+            self.best_psnr = float(best_psnr)
         else:
             print("No Save point found. Starting from epoch 0")
             file = open(self.saveFile, 'w')
-            file.write('0')
+            file.write("0\n")
+            file.write("0.0\n")
             file.close()
             self.startingEpoch = 0
 
     def saveEpoch(self, epoch):
         save = open(self.saveFile, 'w')
-        save.write(str(epoch))
+        save.write(str(epoch) + "\n")
+        save.write(str(self.best_psnr) + "\n")
+        save.close()
         self.save_training_results()
 
 

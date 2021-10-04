@@ -1,11 +1,16 @@
+#######################################
 # NN config
+#######################################
 INPUT_SHAPE = (None, None, 1)
-NN_MODEL = 'strrn'
+NN_MODEL = 'strrn_encodedecode'
+DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode'
+JPEG_QUALITY = 10
+
+# STRRN config
 MPRRN_FILTERS_PER_LAYER = 32
 MPRRN_FILTER_SHAPE = 3
 MPRRN_RRU_PER_IRB = 1
 MPRRN_IRBS = 1
-JPEG_QUALITY = 10
 if JPEG_QUALITY == 10:
     L0_GRADIENT_MIN_LAMDA = 0.04
 elif JPEG_QUALITY == 20:
@@ -18,16 +23,17 @@ else:
     L0_GRADIENT_MIN_LAMDA = 0.005
 L0_GRADIENT_MIN_BETA_MAX = 10000
 
+#######################################
 # Train config
+#######################################
 LOAD_WEIGHTS = False
 SAVE_AND_CONTINUE = True
-EPOCHS = 50
+EPOCHS = 10
 LEARNING_RATE = 0.001
 LEARNING_RATE_DECAY_INTERVAL = 8
 LEARNING_RATE_DECAY = 10
 DATASET_PREFETCH = 3000
-BATCH_SIZE = 32
-TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
+
 GRAD_NORM = 1.0  # max value for gradients. Clipping gradients to prevent NaN issues
 ADAM_EPSILON = 0.001
 if JPEG_QUALITY == 10:
@@ -40,6 +46,14 @@ elif JPEG_QUALITY == 40:
     ACCURACY_PSNR_THRESHOLD = 33.87
 else:
     ACCURACY_PSNR_THRESHOLD = 33.87
+
+BATCH_SIZE = 32
+TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
+
+DATASET_EARLY_STOP = True
+TRAIN_EARLY_STOP = 1000    # number of batches
+VALIDATION_EARLY_STOP = 100
+TEST_EARLY_STOP = 25
 
 SAMPLE_IMAGES = ["sampleCartoonImage", "samplePhotoImage",
                  "sampleUrban100"]
