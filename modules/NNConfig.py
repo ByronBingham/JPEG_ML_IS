@@ -2,7 +2,7 @@
 # NN config
 #######################################
 INPUT_SHAPE = (None, None, 1)
-NN_MODEL = 'strrn_encodedecode'
+NN_MODEL = 'mprrn_only'
 DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode'
 JPEG_QUALITY = 10
 

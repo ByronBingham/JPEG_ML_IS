@@ -152,9 +152,20 @@ def STRRN_encodeDecode():
     return model
 
 
+def MPRRN_only():
+    inputs = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    mprrn = MPRRN(inputs, rrusPerIrb=MPRRN_RRU_PER_IRB, irbCount=MPRRN_IRBS)
+
+    model = tf.keras.Model(inputs=inputs, outputs=mprrn)
+
+    return model
+
+
 modelSwitch = {
     'eqlri': EQLRI_model,
     'kerasexample': kerasExample_model,
     'strrn': STRRN,
-    'strrn_encodedecode': STRRN_encodeDecode
+    'strrn_encodedecode': STRRN_encodeDecode,
+    'mprrn_only': MPRRN_only
 }
