@@ -67,6 +67,13 @@ class TrainNN:
         self.ssimValidationCsv = "./stats/ssim_validation_" + self.info + ".csv"
         self.accuracyValidationCsv = "./stats/accuracy_Validation_" + self.info + ".csv"
 
+        if not os.path.exists("./stats"):
+            os.mkdir("./stats")
+        if not os.path.exists("./sampleImageOutputs"):
+            os.mkdir("./sampleImageOutputs")
+        if not os.path.exists("./checkpoints"):
+            os.mkdir("./checkpoints")
+
         self.models = [Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL]()]
         self.models = np.asarray(self.models)
 
