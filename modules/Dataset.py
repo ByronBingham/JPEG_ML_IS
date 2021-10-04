@@ -10,7 +10,7 @@ from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 
 from modules.NNConfig import DATASET_PREFETCH, JPEG_QUALITY, L0_GRADIENT_MIN_LAMDA, \
     L0_GRADIENT_MIN_BETA_MAX, TRAINING_DATASET, DATASETS_DIR, DATASET_EARLY_STOP, TRAIN_EARLY_STOP, \
-    VALIDATION_EARLY_STOP, TEST_EARLY_STOP
+    VALIDATION_EARLY_STOP, TEST_EARLY_STOP, EVEN_PAD_DATA
 
 BATCH_COMPRESSED = 0
 BATCH_TARGET = 1
@@ -72,6 +72,12 @@ class JPEGDataset(object):
                 img = np.asarray(example[0][0])
             img = img.astype('float32')
             img = img / 255.0
+            if EVEN_PAD_DATA:
+                if (img.shape[0] % 2) == 1:  # if shape is odd, pad to make even
+                    img = np.pad(img, [(0, 1), (0, 0), (0, 0)], constant_values=0)
+                if (img.shape[1] % 2) == 1:
+                    img = np.pad(img, [(0, 0), (0, 1), (0, 0)], constant_values=0)
+
             target_images.append(img)
 
             # compress image and add to inputs

@@ -299,7 +299,7 @@ class TrainNN:
 
             channels_out = []
             for c in range(3):
-                if NN_MODEL == 'strrn':
+                if NN_MODEL in DUAL_CHANNEL_MODELS:
                     model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
                 else:
                     model_out = self.models[c](nn_input[..., c:c + 1])

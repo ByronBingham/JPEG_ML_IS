@@ -55,6 +55,8 @@ TRAIN_EARLY_STOP = 1000    # number of batches
 VALIDATION_EARLY_STOP = 100
 TEST_EARLY_STOP = 25
 
+EVEN_PAD_DATA = True
+
 SAMPLE_IMAGES = ["sampleCartoonImage", "samplePhotoImage",
                  "sampleUrban100"]
 CHECKPOINTS_PATH = "./checkpoints/"
