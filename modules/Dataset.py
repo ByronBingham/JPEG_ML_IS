@@ -72,11 +72,15 @@ class JPEGDataset(object):
                 img = np.asarray(example[0][0])
             img = img.astype('float32')
             img = img / 255.0
-            if EVEN_PAD_DATA:
-                if (img.shape[0] % 2) == 1:  # if shape is odd, pad to make even
-                    img = np.pad(img, [(0, 1), (0, 0), (0, 0)], constant_values=0)
-                if (img.shape[1] % 2) == 1:
-                    img = np.pad(img, [(0, 0), (0, 1), (0, 0)], constant_values=0)
+
+            # pad data for conv/deconv layers
+            if EVEN_PAD_DATA > 1:
+                if (img.shape[0] % EVEN_PAD_DATA) != 0:  # if shape is odd, pad to make even
+                    img = np.pad(img, [(0, EVEN_PAD_DATA - (img.shape[0] % EVEN_PAD_DATA)), (0, 0), (0, 0)],
+                                 constant_values=0)
+                if (img.shape[1] % EVEN_PAD_DATA) != 0:
+                    img = np.pad(img, [(0, 0), (0, EVEN_PAD_DATA - (img.shape[1] % EVEN_PAD_DATA)), (0, 0)],
+                                 constant_values=0)
 
             target_images.append(img)
 

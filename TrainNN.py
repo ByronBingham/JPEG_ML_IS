@@ -7,7 +7,7 @@ from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
-    DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS
+    DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessInputsForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
@@ -299,6 +299,17 @@ class TrainNN:
             pil_img = Image.open("./sampleImages/" + file + ".png" + ".compressed.jpg")
             nn_input = np.array(pil_img, dtype='float32') / 255.0
             nn_input = np.expand_dims(nn_input, axis=0)
+
+            # pad data for conv/deconv layers
+            if EVEN_PAD_DATA > 1:
+                if (nn_input.shape[1] % EVEN_PAD_DATA) != 0:  # if shape is odd, pad to make even
+                    nn_input = np.pad(nn_input,
+                                      [(0, EVEN_PAD_DATA - (nn_input.shape[1] % EVEN_PAD_DATA)), (0, 0), (0, 0)],
+                                      constant_values=0)
+                if (nn_input.shape[2] % EVEN_PAD_DATA) != 0:
+                    nn_input = np.pad(nn_input,
+                                      [(0, 0), (0, EVEN_PAD_DATA - (nn_input.shape[2] % EVEN_PAD_DATA)), (0, 0)],
+                                      constant_values=0)
 
             structureIn, textureIn = None, None
             if NN_MODEL in DUAL_CHANNEL_MODELS:

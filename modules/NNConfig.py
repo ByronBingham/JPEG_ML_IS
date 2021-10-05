@@ -2,8 +2,8 @@
 # NN config
 #######################################
 INPUT_SHAPE = (None, None, 1)
-NN_MODEL = 'mprrn_only'
-DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode'
+NN_MODEL = 'strrn_no_irb_residual'
+DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode strrn_no_irb_residual'
 JPEG_QUALITY = 10
 
 # STRRN config
@@ -51,11 +51,11 @@ BATCH_SIZE = 32
 TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
 
 DATASET_EARLY_STOP = True
-TRAIN_EARLY_STOP = 1000    # number of batches
-VALIDATION_EARLY_STOP = 100
-TEST_EARLY_STOP = 25
+TRAIN_EARLY_STOP = 1#1000    # number of batches
+VALIDATION_EARLY_STOP = 1#100
+TEST_EARLY_STOP = 1#25
 
-EVEN_PAD_DATA = True
+EVEN_PAD_DATA = 0   # should be powers of 2
 
 SAMPLE_IMAGES = ["sampleCartoonImage", "samplePhotoImage",
                  "sampleUrban100"]
