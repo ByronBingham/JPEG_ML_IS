@@ -276,6 +276,41 @@ def STRRN_no_IRB_residual():
     return model
 
 
+def MPRRN_no_IRB_residual_encodeDecode(inputs, rrusPerIrb, irbCount):
+    conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(inputs)
+
+    conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)
+    conv_3 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)
+
+    irbs = []
+    for i in range(irbCount):
+        if i == 0:
+            irbs.append(MPRRN_IRB(conv_1, rrusPerIrb, conv_2, conv_3))
+        else:
+            irbs.append(MPRRN_IRB(irbs[i - 1], rrusPerIrb, conv_2, conv_3))
+
+    conv_4 = Conv2D(filters=INPUT_SHAPE[-1], kernel_size=MPRRN_FILTER_SHAPE, padding='same')(irbs[-1])
+
+    return conv_4
+
+
+def STRRN_no_IRB_residual_encodeDecode():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    structure_mprrn = MPRRN_no_IRB_residual_encodeDecode(structure_input, rrusPerIrb=MPRRN_RRU_PER_IRB,
+                                                         irbCount=MPRRN_IRBS)
+    texture_mprrn = MPRRN_no_IRB_residual_encodeDecode(texture_input, rrusPerIrb=MPRRN_RRU_PER_IRB, irbCount=MPRRN_IRBS)
+
+    aggregator_input = Add()([structure_mprrn, texture_mprrn])
+
+    aggregator = MPRRN_no_IRB_residual(aggregator_input, rrusPerIrb=1, irbCount=1)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=aggregator)
+
+    return model
+
+
 modelSwitch = {
     'eqlri': EQLRI_model,
     'kerasexample': kerasExample_model,
@@ -284,5 +319,6 @@ modelSwitch = {
     'mprrn_only': MPRRN_only,
     'mprrn_encodedecode': MPRRN_only_encodeDecode,
     'mprrn_encodedecode_4layer': MPRRN_only_encodeDecode_4layer,
-    'strrn_no_irb_residual': STRRN_no_IRB_residual
+    'strrn_no_irb_residual': STRRN_no_IRB_residual,
+    'strrn_no_irb_residual_encodedecode': STRRN_no_IRB_residual_encodeDecode
 }
