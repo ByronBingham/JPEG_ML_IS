@@ -7,7 +7,7 @@ from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
-    DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA
+    DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessInputsForSTRRN
 from modules.Losses import MGE_MSE_combinedLoss
 from PIL import Image
@@ -52,6 +52,8 @@ class TrainNN:
 
         if DATASET_EARLY_STOP:
             self.info = "minirun_" + self.info
+
+        self.info = self.info + "filterShape" + str(MPRRN_FILTER_SHAPE)
 
         self.saveFile = self.info + ".save"
         self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
