@@ -7,9 +7,10 @@ from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
-    DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE
-from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessInputsForSTRRN
-from modules.Losses import MGE_MSE_combinedLoss
+    DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING
+from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessDataForSTRRN, \
+    preprocessInputsForSTRRN
+from modules.Losses import JPEGLoss
 from PIL import Image
 from pathlib import Path
 
@@ -42,23 +43,24 @@ class TrainNN:
         if NN_MODEL == 'strrn':
             self.info = NN_MODEL + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(
                 MPRRN_IRBS) + "_QL" + str(
-                JPEG_QUALITY) + "_L0Lmb" + str(L0_GRADIENT_MIN_LAMDA) + "_" + str(EPOCHS) + "epochs_batchSize" + str(
-                BATCH_SIZE) + "_learningRate" + str(
-                LEARNING_RATE)
+                JPEG_QUALITY) + "_L0Lmb" + str(L0_GRADIENT_MIN_LAMDA)
         else:
-            self.info = NN_MODEL + "_QL" + str(JPEG_QUALITY) + "_" + str(EPOCHS) + "epochs_batchSize" + str(
-                BATCH_SIZE) + "_learningRate" + str(
-                LEARNING_RATE)
+            self.info = NN_MODEL
 
         if DATASET_EARLY_STOP:
             self.info = "minirun_" + self.info
 
-        self.info = self.info + "filterShape" + str(MPRRN_FILTER_SHAPE)
+        if NN_MODEL == 'mprrn_only' and (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
+            self.info = MPRRN_TRAINING + self.info
+
+        self.info = self.info + "_QL" + str(JPEG_QUALITY) + "filterShape" + "_batchSize" + str(
+            BATCH_SIZE) + "_learningRate" + str(
+            LEARNING_RATE) + str(MPRRN_FILTER_SHAPE)
 
         self.saveFile = self.info + ".save"
         self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
-        self.ssimTrainCsv = "./stats/loss_train_" + self.info + ".csv"
-        self.lossTrainCsv = "./stats/ssim_train_" + self.info + ".csv"
+        self.ssimTrainCsv = "./stats/ssim_train_" + self.info + ".csv"
+        self.lossTrainCsv = "./stats/loss_train_" + self.info + ".csv"
         self.accuracyTrainCsv = "./stats/accuracy_train_" + self.info + ".csv"
         self.psnrTestCsv = "./stats/psnr_test_" + self.info + ".csv"
         self.lossTestCsv = "./stats/loss_test_" + self.info + ".csv"
@@ -104,6 +106,46 @@ class TrainNN:
             self.sample_output_images(epoch)
             self.saveEpoch(epoch + 1)
 
+    def get_model_out(self, c, batch, structureIn, textureIn):
+        model_out = None
+
+        if NN_MODEL in DUAL_CHANNEL_MODELS:
+            model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]], training=True)
+        elif NN_MODEL == 'mprrn_only':
+            if MPRRN_TRAINING == 'structure':
+                model_out = self.models[c](structureIn[..., c:c + 1], training=True)
+            elif MPRRN_TRAINING == 'texture':
+                model_out = self.models[c](textureIn[..., c:c + 1], training=True)
+        else:
+            model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1], training=True)
+
+        return model_out
+
+    def get_model_out_and_metrics(self, c, batch, structureIn, textureIn, structureTarget, textureTarget):
+        psnr = None
+        ssim = None
+        loss = None
+
+        model_out = self.get_model_out(c, batch, structureIn, textureIn)
+
+        # multiply output by the padding mask to make sure padded areas are 0
+        # model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c + 1])
+        if NN_MODEL == 'mprrn_only':
+            if MPRRN_TRAINING == 'structure':
+                loss = JPEGLoss(model_out, structureTarget[..., c:c + 1], structureIn[..., c:c + 1])
+                psnr = tf.image.psnr(structureTarget[..., c:c + 1], model_out, max_val=1.0)
+                ssim = tf.image.ssim(structureTarget[..., c:c + 1], model_out, max_val=1.0)
+            elif MPRRN_TRAINING == 'texture':
+                loss = JPEGLoss(model_out, textureTarget[..., c:c + 1], textureIn[..., c:c + 1])
+                psnr = tf.image.psnr(textureTarget[..., c:c + 1], model_out, max_val=1.0)
+                ssim = tf.image.ssim(textureTarget[..., c:c + 1], model_out, max_val=1.0)
+        else:
+            loss = JPEGLoss(model_out, batch[BATCH_TARGET][..., c:c + 1], batch[BATCH_COMPRESSED][..., c:c + 1])
+            psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+            ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+
+        return model_out, loss, psnr, ssim
+
     def do_epoch(self, epoch, learningRate):
         optimizer = tf.keras.optimizers.Adam(learning_rate=learningRate, epsilon=ADAM_EPSILON)
         batches = 0
@@ -114,32 +156,16 @@ class TrainNN:
         trainData = JPEGDataset('train', BATCH_SIZE)
 
         for batch in trainData:
-            structureIn, textureIn = None, None
-            if NN_MODEL in DUAL_CHANNEL_MODELS:
-                structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
-
-            # DEBUG
-            # channels_out = []
-            # DEBUG
+            structureIn, textureIn, structureTarget, textureTarget = None, None, None, None
+            if (NN_MODEL in DUAL_CHANNEL_MODELS) or (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
+                structureIn, textureIn, structureTarget, textureTarget = preprocessDataForSTRRN(batch)
 
             for c in range(3):  # do separate training pass for each RGB channel
+
                 with tf.GradientTape() as tape:
                     tape.watch(self.models[c].trainable_variables)
-                    if NN_MODEL in DUAL_CHANNEL_MODELS:
-                        model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]], training=True)
-                    else:
-                        model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1], training=True)
-
-                    # multiply output by the padding mask to make sure padded areas are 0
-                    # model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c + 1])
-
-                    # DEBUG
-                    # channels_out.append(np.asarray(model_out))
-                    # DEBUG
-
-                    loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
-                    psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
-                    ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+                    model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch, structureIn, textureIn,
+                                                                                 structureTarget, textureTarget)
 
                     total_loss += np.average(loss)
                     total_psnr += np.average(psnr)
@@ -151,18 +177,7 @@ class TrainNN:
                     gradients = [tf.clip_by_norm(g, GRAD_NORM) for g in gradients]
                     optimizer.apply_gradients(zip(gradients, self.models[c].trainable_variables))
 
-            '''
-            # DEBUG
-            arr = np.array(channels_out)
-            image_out = np.concatenate(arr, axis=-1)
-
-            self.saveNNOutput(image_out, "NN_Output.png")
-            self.saveNNOutput(batch[BATCH_COMPRESSED], "This_should_be_NN_input.png")
-            self.saveNNOutput(batch[BATCH_TARGET], "This_should_be_target_data.png")
-            # DEBUG
-            '''
-
-            print("Batch " + str(batches + 1) + " Complete")
+            print("Batch " + str(batches + 1) + " Complete", end="\r")
             batches = batches + 1
 
         avg_loss = total_loss / batches / 3
@@ -194,19 +209,14 @@ class TrainNN:
         testData = JPEGDataset('validation', BATCH_SIZE)
 
         for batch in testData:
-            structureIn, textureIn = None, None
-            if NN_MODEL in DUAL_CHANNEL_MODELS:
-                structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
+            structureIn, textureIn, structureTarget, textureTarget = None, None, None, None
+            if (NN_MODEL in DUAL_CHANNEL_MODELS) or (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
+                structureIn, textureIn, structureTarget, textureTarget = preprocessDataForSTRRN(batch)
 
             for c in range(3):
-                if NN_MODEL in DUAL_CHANNEL_MODELS:
-                    model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
-                else:
-                    model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1])
 
-                loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
-                psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
-                ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+                model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch, structureIn, textureIn,
+                                                                             structureTarget, textureTarget)
 
                 total_loss += np.average(loss)
                 total_psnr += np.average(psnr)
@@ -243,19 +253,14 @@ class TrainNN:
         testData = JPEGDataset('test', TEST_BATCH_SIZE)
 
         for batch in testData:
-            structureIn, textureIn = None, None
-            if NN_MODEL in DUAL_CHANNEL_MODELS:
-                structureIn, textureIn = preprocessInputsForSTRRN(batch[BATCH_COMPRESSED])
+            structureIn, textureIn, structureTarget, textureTarget = None, None, None, None
+            if (NN_MODEL in DUAL_CHANNEL_MODELS) or (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
+                structureIn, textureIn, structureTarget, textureTarget = preprocessDataForSTRRN(batch)
 
             for c in range(3):
-                if NN_MODEL in DUAL_CHANNEL_MODELS:
-                    model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
-                else:
-                    model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1])
 
-                loss = MGE_MSE_combinedLoss(model_out, batch[BATCH_TARGET][..., c:c + 1])
-                psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
-                ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+                model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch, structureIn, textureIn,
+                                                                             structureTarget, textureTarget)
 
                 total_loss += np.average(loss)
                 total_psnr += np.average(psnr)
@@ -306,7 +311,8 @@ class TrainNN:
             if EVEN_PAD_DATA > 1:
                 if (nn_input.shape[1] % EVEN_PAD_DATA) != 0:  # if shape is odd, pad to make even
                     nn_input = np.pad(nn_input,
-                                      [(0, EVEN_PAD_DATA - (nn_input.shape[1] % EVEN_PAD_DATA)), (0, 0), (0, 0)],
+                                      [(0, 0), (0, EVEN_PAD_DATA - (nn_input.shape[1] % EVEN_PAD_DATA)), (0, 0),
+                                       (0, 0)],
                                       constant_values=0)
                 if (nn_input.shape[2] % EVEN_PAD_DATA) != 0:
                     nn_input = np.pad(nn_input,
@@ -314,15 +320,12 @@ class TrainNN:
                                       constant_values=0)
 
             structureIn, textureIn = None, None
-            if NN_MODEL in DUAL_CHANNEL_MODELS:
+            if (NN_MODEL in DUAL_CHANNEL_MODELS) or (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
                 structureIn, textureIn = preprocessInputsForSTRRN(np.asarray(nn_input))
 
             channels_out = []
             for c in range(3):
-                if NN_MODEL in DUAL_CHANNEL_MODELS:
-                    model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
-                else:
-                    model_out = self.models[c](nn_input[..., c:c + 1])
+                model_out = self.get_model_out(c, np.array([nn_input]), structureIn, textureIn)
 
                 channels_out.append(np.asarray(model_out))
 

@@ -1,6 +1,8 @@
 import tensorflow as tf
 import numpy as np
 
+from modules.NNConfig import NN_MODEL, MPRRN_TRAINING
+
 
 def MeanGradientError(outputs, targets):
     """
@@ -32,10 +34,21 @@ def MeanGradientError(outputs, targets):
     return mge
 
 
-def MGE_MSE_combinedLoss(outputs, targets):
-    # mge = MeanGradientError(outputs, targets)
-    mse = tf.losses.mse(targets, outputs)
+def MPRRN_Loss(outputs, targets, inputs):
+    y_min_x = tf.math.subtract(targets, inputs)
+    out_min_diff = tf.math.subtract(outputs, y_min_x)
+    sqr1 = tf.math.square(out_min_diff)
+    sum1 = tf.math.reduce_sum(sqr1)
+    div1 = tf.math.divide(sum1, outputs.shape[0])
 
-    # out = 0.1 * float(mge) + mse  # leave mge cast to float. NN seems to explode (NaN's) if mge is left as-is
-    out = mse
+    return div1
+
+
+def JPEGLoss(outputs, targets, inputs):
+
+    if NN_MODEL == 'mprrn_only' and (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
+        out = MPRRN_Loss(outputs, targets, inputs)
+    else:
+        out = tf.losses.mse(targets, outputs)
+
     return out

@@ -1,7 +1,9 @@
 import tensorflow as tf
 
-from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, ReLU, Add, Activation, Conv2DTranspose, Layer
-from modules.NNConfig import INPUT_SHAPE, MPRRN_FILTERS_PER_LAYER, MPRRN_FILTER_SHAPE, MPRRN_RRU_PER_IRB, MPRRN_IRBS
+from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, ReLU, Add, Activation, Conv2DTranspose, Layer, \
+    Dropout
+from modules.NNConfig import INPUT_SHAPE, MPRRN_FILTERS_PER_LAYER, MPRRN_FILTER_SHAPE, MPRRN_RRU_PER_IRB, MPRRN_IRBS, \
+    DROPOUT_RATE
 
 
 def EQLRI_model():
@@ -311,6 +313,48 @@ def STRRN_no_IRB_residual_encodeDecode():
     return model
 
 
+def hourglass_6():
+    inputs = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    conv1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                   activation='relu')(inputs)
+    dropout1 = Dropout(rate=DROPOUT_RATE)(conv1)
+    batchNorm1 = BatchNormalization()(dropout1)
+    conv2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                   activation='relu')(batchNorm1)
+    dropout2 = Dropout(rate=DROPOUT_RATE)(conv2)
+    batchNorm2 = BatchNormalization()(dropout2)
+    conv3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                   activation='relu')(batchNorm2)
+    dropout3 = Dropout(rate=DROPOUT_RATE)(conv3)
+    batchNorm3 = BatchNormalization()(dropout3)
+
+    deconv1 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                              strides=2, activation='relu')(batchNorm3)
+    dropout4 = BatchNormalization()(deconv1)
+    batchNorm4 = BatchNormalization()(dropout4)
+    sum1 = Add()([conv2, batchNorm4])
+
+    deconv2 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                              strides=2, activation='relu')(sum1)
+    dropout5 = Dropout(rate=DROPOUT_RATE)(deconv2)
+    batchNorm5 = BatchNormalization()(dropout5)
+    sum2 = Add()([conv1, batchNorm5])
+
+    deconv3 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                              strides=2, activation='relu')(sum2)
+    dropout6 = Dropout(rate=DROPOUT_RATE)(deconv3)
+    batchNorm6 = BatchNormalization()(dropout6)
+
+    conv4 = Conv2D(filters=1, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=1, activation='relu')(
+        batchNorm6)
+    batchNorm7 = BatchNormalization()(conv4)
+
+    model = tf.keras.Model(inputs=inputs, outputs=batchNorm7)
+
+    return model
+
+
 modelSwitch = {
     'eqlri': EQLRI_model,
     'kerasexample': kerasExample_model,
@@ -320,5 +364,6 @@ modelSwitch = {
     'mprrn_encodedecode': MPRRN_only_encodeDecode,
     'mprrn_encodedecode_4layer': MPRRN_only_encodeDecode_4layer,
     'strrn_no_irb_residual': STRRN_no_IRB_residual,
-    'strrn_no_irb_residual_encodedecode': STRRN_no_IRB_residual_encodeDecode
+    'strrn_no_irb_residual_encodedecode': STRRN_no_IRB_residual_encodeDecode,
+    'hourglass_6': hourglass_6
 }

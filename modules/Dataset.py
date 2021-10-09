@@ -147,9 +147,55 @@ class JPEGDataset(object):
         return compressed_images, target_images, pad_mask
 
 
+def preprocessDataForSTRRN(batch):
+    """
+
+    :param batch: compressed and target data
+    :return:
+    """
+    structure_in = []
+    texture_in = []
+    structure_target = []
+    texture_target = []
+
+    batch = np.asarray(batch)
+
+    for b in range(batch.shape[1]):
+        # process compressed data (input)
+        originalCompressed = batch[0][b]
+        compressedStructure = l0_gradient_minimization_2d(originalCompressed, lmd=L0_GRADIENT_MIN_LAMDA,
+                                                          beta_max=L0_GRADIENT_MIN_BETA_MAX)
+        compressedStructure = np.clip(compressedStructure, a_min=0.0, a_max=1.0)
+        compressedTexture = np.subtract(originalCompressed, compressedStructure)
+
+        structure_in.append(compressedStructure)
+        texture_in.append(compressedTexture)
+
+        # process target data
+        originalTarget = batch[1][b]
+        targetStructure = l0_gradient_minimization_2d(originalTarget, lmd=L0_GRADIENT_MIN_LAMDA,
+                                                      beta_max=L0_GRADIENT_MIN_BETA_MAX)
+        targetStructure = np.clip(targetStructure, a_min=0.0, a_max=1.0)
+        targetTexture = np.subtract(originalTarget, targetStructure)
+
+        structure_target.append(targetStructure)
+        texture_target.append(targetTexture)
+
+    structure_in = np.asarray(structure_in)
+    texture_in = np.asarray(texture_in)
+    structure_target = np.asarray(structure_target)
+    texture_target = np.asarray(texture_target)
+
+    structure_in = structure_in.astype('float32')
+    texture_in = texture_in.astype('float32')
+    structure_target = structure_target.astype('float32')
+    texture_target = texture_target.astype('float32')
+
+    return structure_in, texture_in, structure_target, texture_target
+
+
 def preprocessInputsForSTRRN(batch_compressed):
     '''
-
     :param batch_compressed: compressed images only (no targets or masks)
     :return:
     '''
@@ -160,6 +206,7 @@ def preprocessInputsForSTRRN(batch_compressed):
         originalCompressed = batch_compressed[b]
         imageStructure = l0_gradient_minimization_2d(originalCompressed, lmd=L0_GRADIENT_MIN_LAMDA,
                                                      beta_max=L0_GRADIENT_MIN_BETA_MAX)
+        imageStructure = np.clip(imageStructure, a_min=0.0, a_max=1.0)
         imageTexture = np.subtract(originalCompressed, imageStructure)
 
         batch_structure.append(imageStructure)

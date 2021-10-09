@@ -2,13 +2,15 @@
 # NN config
 #######################################
 INPUT_SHAPE = (None, None, 1)
-NN_MODEL = 'strrn_no_irb_residual_encodedecode'
+NN_MODEL = 'mprrn_only'
 DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode strrn_no_irb_residual strrn_no_irb_residual_encodedecode'
 JPEG_QUALITY = 10
 
 # STRRN config
+MPRRN_TRAINING = 'structure'
+PRETRAINED_MPRRN_PATH = './pretrainedModels/'
 MPRRN_FILTERS_PER_LAYER = 32
-MPRRN_FILTER_SHAPE = 9
+MPRRN_FILTER_SHAPE = 3
 MPRRN_RRU_PER_IRB = 1
 MPRRN_IRBS = 1
 if JPEG_QUALITY == 10:
@@ -49,8 +51,9 @@ else:
 
 BATCH_SIZE = 32
 TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
+DROPOUT_RATE = 0.2
 
-DATASET_EARLY_STOP = True
+DATASET_EARLY_STOP = False
 TRAIN_EARLY_STOP = 1000    # number of batches
 VALIDATION_EARLY_STOP = 100
 TEST_EARLY_STOP = 25
