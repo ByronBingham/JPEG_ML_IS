@@ -1,4 +1,4 @@
-"""urban100_dataset dataset."""
+"""div2k_preprocessed dataset."""
 
 import tensorflow_datasets as tfds
 import numpy as np
@@ -17,7 +17,7 @@ _CITATION = """
 """
 
 
-class Urban100Dataset(tfds.core.GeneratorBasedBuilder):
+class Div2kPreprocessed(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for urban100_dataset dataset."""
 
     VERSION = tfds.core.Version('1.0.0')
@@ -49,12 +49,12 @@ class Urban100Dataset(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Returns SplitGenerators."""
-        # path = dl_manager.download_and_extract('https://uofi.box.com/shared/static/65upg43jjd0a4cwsiqgl6o6ixube6klm.zip')
-
-        path = Path("e:/datasets/urban100_dataset/preprocessed/image_SRF_2")
+        path_train = Path("e:/datasets/div2k_dataset/preprocessed/train")
+        path_validation = Path("e:/datasets/div2k_dataset/preprocessed/validation")
 
         return {
-            'test': self._generate_examples(path),
+            'train': self._generate_examples(path_train),
+            'validation': self._generate_examples(path_validation)
         }
 
     def _generate_examples(self, path):
@@ -65,11 +65,11 @@ class Urban100Dataset(tfds.core.GeneratorBasedBuilder):
 
             baseName = str(f).replace("original.ndarray", "")
 
-            target_structure = np.fromfile(baseName + "target_structure.ndarray", dtype='float32')
-            target_texture = np.fromfile(baseName + "target_texture.ndarray", dtype='float32')
-            compressed_structure = np.fromfile(baseName + "compressed_structure.ndarray", dtype='float32')
-            compressed_texture = np.fromfile(baseName + "compressed_texture.ndarray", dtype='float32')
-            compressed = np.fromfile(baseName + "compressed.ndarray", dtype='float32')
+            target_structure = np.fromfile(baseName + "target_structure.ndarray", dtype="float32")
+            target_texture = np.fromfile(baseName + "target_texture.ndarray", dtype="float32")
+            compressed_structure = np.fromfile(baseName + "compressed_structure.ndarray", dtype="float32")
+            compressed_texture = np.fromfile(baseName + "compressed_texture.ndarray", dtype="float32")
+            compressed = np.fromfile(baseName + "compressed.ndarray", dtype="float32")
 
             yield str(f), {
                 'original': original,

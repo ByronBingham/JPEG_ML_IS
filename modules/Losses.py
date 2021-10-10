@@ -39,15 +39,26 @@ def MPRRN_Loss(outputs, targets, inputs):
     out_min_diff = tf.math.subtract(outputs, y_min_x)
     sqr1 = tf.math.square(out_min_diff)
     sum1 = tf.math.reduce_sum(sqr1)
+    # sqrt1 = tf.math.sqrt(sum1)
+    # sqr2 = tf.math.square(sqrt1)
     div1 = tf.math.divide(sum1, outputs.shape[0])
 
     return div1
 
 
-def JPEGLoss(outputs, targets, inputs):
+def MGE_MSE_combinedLoss(outputs, targets):
+    mge = MeanGradientError(outputs, targets)
+    mse = tf.losses.mse(targets, outputs)
 
+    out = 0.9 * float(mge) + mse  # leave mge cast to float. NN seems to explode (NaN's) if mge is left as-is
+    return out
+
+
+def JPEGLoss(outputs, targets, inputs):
     if NN_MODEL == 'mprrn_only' and (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
-        out = MPRRN_Loss(outputs, targets, inputs)
+        # out = MPRRN_Loss(outputs, targets, inputs)
+        # out = MGE_MSE_combinedLoss(outputs, targets)
+        out = tf.losses.mse(targets, outputs)
     else:
         out = tf.losses.mse(targets, outputs)
 

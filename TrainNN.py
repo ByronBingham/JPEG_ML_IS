@@ -7,7 +7,8 @@ from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
-    DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING
+    DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING, PRETRAINED_MPRRN_PATH, \
+    PRETRAINED_STRUCTURE, PRETRAINED_TEXTURE
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessDataForSTRRN, \
     preprocessInputsForSTRRN
 from modules.Losses import JPEGLoss
@@ -81,6 +82,15 @@ class TrainNN:
         self.models = [Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL]()]
         self.models = np.asarray(self.models)
 
+        self.structureModel = None
+        self.textureModel = None
+
+        if NN_MODEL == 'mprrn_only' and MPRRN_TRAINING == 'aggregator':
+            self.structureModel = Model.modelSwitch[NN_MODEL]()
+            self.textureModel = Model.modelSwitch[NN_MODEL]()
+            self.structureModel.load_weights(PRETRAINED_MPRRN_PATH + PRETRAINED_STRUCTURE)
+            self.textureModel.load_weights(PRETRAINED_MPRRN_PATH + PRETRAINED_TEXTURE)
+
         self.startingEpoch = 0
         self.best_psnr = 0.0
 
@@ -106,43 +116,51 @@ class TrainNN:
             self.sample_output_images(epoch)
             self.saveEpoch(epoch + 1)
 
-    def get_model_out(self, c, batch, structureIn, textureIn):
+    def get_model_out(self, c, compressed_structure, compressed_texture, compressed):
         model_out = None
+        structure_out = None
+        texture_out = None
 
+        if NN_MODEL == 'mprrn_only' and MPRRN_TRAINING == 'aggregator':
+            structure_out = self.structureModel(compressed_structure[..., c:c + 1])
+            texture_out = self.textureModel(compressed_texture[..., c:c + 1])
         if NN_MODEL in DUAL_CHANNEL_MODELS:
-            model_out = self.models[c]([structureIn[..., c:c + 1], textureIn[..., c:c + 1]], training=True)
+            model_out = self.models[c]([compressed_structure[..., c:c + 1], compressed_texture[..., c:c + 1]],
+                                       training=True)
         elif NN_MODEL == 'mprrn_only':
             if MPRRN_TRAINING == 'structure':
-                model_out = self.models[c](structureIn[..., c:c + 1], training=True)
+                model_out = self.models[c](compressed_structure[..., c:c + 1], training=True)
             elif MPRRN_TRAINING == 'texture':
-                model_out = self.models[c](textureIn[..., c:c + 1], training=True)
+                model_out = self.models[c](compressed_texture[..., c:c + 1], training=True)
+            elif MPRRN_TRAINING == 'aggregator':
+                model_out = self.models[c]([structure_out, texture_out])
+
         else:
-            model_out = self.models[c](batch[BATCH_COMPRESSED][..., c:c + 1], training=True)
+            model_out = self.models[c](compressed[..., c:c + 1], training=True)
 
         return model_out
 
-    def get_model_out_and_metrics(self, c, batch, structureIn, textureIn, structureTarget, textureTarget):
+    def get_model_out_and_metrics(self, c, compressed_structure, compressed_texture,
+                                  target_structure, target_texture, original, compressed):
         psnr = None
         ssim = None
         loss = None
 
-        model_out = self.get_model_out(c, batch, structureIn, textureIn)
+        model_out = self.get_model_out(c, compressed_structure, compressed_texture, compressed)
 
-        # multiply output by the padding mask to make sure padded areas are 0
-        # model_out = tf.math.multiply(model_out, batch[BATCH_PAD_MASK][..., c:c + 1])
         if NN_MODEL == 'mprrn_only':
             if MPRRN_TRAINING == 'structure':
-                loss = JPEGLoss(model_out, structureTarget[..., c:c + 1], structureIn[..., c:c + 1])
-                psnr = tf.image.psnr(structureTarget[..., c:c + 1], model_out, max_val=1.0)
-                ssim = tf.image.ssim(structureTarget[..., c:c + 1], model_out, max_val=1.0)
+                loss = JPEGLoss(model_out, target_structure[..., c:c + 1], compressed_structure[..., c:c + 1])
+                psnr = tf.image.psnr(target_structure[..., c:c + 1], model_out, max_val=1.0)
+                ssim = tf.image.ssim(target_structure[..., c:c + 1], model_out, max_val=1.0)
             elif MPRRN_TRAINING == 'texture':
-                loss = JPEGLoss(model_out, textureTarget[..., c:c + 1], textureIn[..., c:c + 1])
-                psnr = tf.image.psnr(textureTarget[..., c:c + 1], model_out, max_val=1.0)
-                ssim = tf.image.ssim(textureTarget[..., c:c + 1], model_out, max_val=1.0)
+                loss = JPEGLoss(model_out, target_texture[..., c:c + 1], compressed_texture[..., c:c + 1])
+                psnr = tf.image.psnr(target_texture[..., c:c + 1], model_out, max_val=1.0)
+                ssim = tf.image.ssim(target_texture[..., c:c + 1], model_out, max_val=1.0)
         else:
-            loss = JPEGLoss(model_out, batch[BATCH_TARGET][..., c:c + 1], batch[BATCH_COMPRESSED][..., c:c + 1])
-            psnr = tf.image.psnr(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
-            ssim = tf.image.ssim(batch[BATCH_TARGET][..., c:c + 1], model_out, max_val=1.0)
+            loss = JPEGLoss(model_out, original[..., c:c + 1], compressed[..., c:c + 1])
+            psnr = tf.image.psnr(original[..., c:c + 1], model_out, max_val=1.0)
+            ssim = tf.image.ssim(original[..., c:c + 1], model_out, max_val=1.0)
 
         return model_out, loss, psnr, ssim
 
@@ -156,16 +174,21 @@ class TrainNN:
         trainData = JPEGDataset('train', BATCH_SIZE)
 
         for batch in trainData:
-            structureIn, textureIn, structureTarget, textureTarget = None, None, None, None
-            if (NN_MODEL in DUAL_CHANNEL_MODELS) or (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
-                structureIn, textureIn, structureTarget, textureTarget = preprocessDataForSTRRN(batch)
+            original = batch['original']
+            target_structure = batch['target_structure']
+            target_texture = batch['target_texture']
+            compressed_structure = batch['compressed_structure']
+            compressed_texture = batch['compressed_texture']
+            compressed = batch['compressed']
 
             for c in range(3):  # do separate training pass for each RGB channel
 
                 with tf.GradientTape() as tape:
                     tape.watch(self.models[c].trainable_variables)
-                    model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch, structureIn, textureIn,
-                                                                                 structureTarget, textureTarget)
+                    model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch, compressed_structure,
+                                                                                 compressed_texture,
+                                                                                 target_structure, target_texture,
+                                                                                 original, compressed)
 
                     total_loss += np.average(loss)
                     total_psnr += np.average(psnr)
