@@ -185,7 +185,7 @@ class TrainNN:
 
                 with tf.GradientTape() as tape:
                     tape.watch(self.models[c].trainable_variables)
-                    model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch, compressed_structure,
+                    model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, compressed_structure,
                                                                                  compressed_texture,
                                                                                  target_structure, target_texture,
                                                                                  original, compressed)
@@ -232,14 +232,19 @@ class TrainNN:
         testData = JPEGDataset('validation', BATCH_SIZE)
 
         for batch in testData:
-            structureIn, textureIn, structureTarget, textureTarget = None, None, None, None
-            if (NN_MODEL in DUAL_CHANNEL_MODELS) or (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
-                structureIn, textureIn, structureTarget, textureTarget = preprocessDataForSTRRN(batch)
+            original = batch['original']
+            target_structure = batch['target_structure']
+            target_texture = batch['target_texture']
+            compressed_structure = batch['compressed_structure']
+            compressed_texture = batch['compressed_texture']
+            compressed = batch['compressed']
 
             for c in range(3):
 
-                model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch, structureIn, textureIn,
-                                                                             structureTarget, textureTarget)
+                model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, compressed_structure,
+                                                                             compressed_texture,
+                                                                             target_structure, target_texture, original,
+                                                                             compressed)
 
                 total_loss += np.average(loss)
                 total_psnr += np.average(psnr)
@@ -276,14 +281,19 @@ class TrainNN:
         testData = JPEGDataset('test', TEST_BATCH_SIZE)
 
         for batch in testData:
-            structureIn, textureIn, structureTarget, textureTarget = None, None, None, None
-            if (NN_MODEL in DUAL_CHANNEL_MODELS) or (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
-                structureIn, textureIn, structureTarget, textureTarget = preprocessDataForSTRRN(batch)
+            original = batch['original']
+            target_structure = batch['target_structure']
+            target_texture = batch['target_texture']
+            compressed_structure = batch['compressed_structure']
+            compressed_texture = batch['compressed_texture']
+            compressed = batch['compressed']
 
             for c in range(3):
 
-                model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch, structureIn, textureIn,
-                                                                             structureTarget, textureTarget)
+                model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, compressed_structure,
+                                                                             compressed_texture,
+                                                                             target_structure, target_texture, original,
+                                                                             compressed)
 
                 total_loss += np.average(loss)
                 total_psnr += np.average(psnr)
@@ -348,7 +358,7 @@ class TrainNN:
 
             channels_out = []
             for c in range(3):
-                model_out = self.get_model_out(c, np.array([nn_input]), structureIn, textureIn)
+                model_out = self.get_model_out(c, structureIn, textureIn, nn_input)
 
                 channels_out.append(np.asarray(model_out))
 
@@ -444,5 +454,7 @@ trainNn.sample_compress()
 
 trainNn.train()
 
-# trainNn.load_weights()
-# trainNn.sample_output_images(99)
+# Init datasets
+# trainData = JPEGDataset('train', BATCH_SIZE)
+# testData = JPEGDataset('test', BATCH_SIZE)
+# validationData = JPEGDataset('validation', BATCH_SIZE)

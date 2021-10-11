@@ -11,7 +11,7 @@ from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 
 from modules.NNConfig import DATASET_PREFETCH, JPEG_QUALITY, L0_GRADIENT_MIN_LAMDA, \
     L0_GRADIENT_MIN_BETA_MAX, TRAINING_DATASET, DATASETS_DIR, DATASET_EARLY_STOP, TRAIN_EARLY_STOP, \
-    VALIDATION_EARLY_STOP, TEST_EARLY_STOP, EVEN_PAD_DATA
+    VALIDATION_EARLY_STOP, TEST_EARLY_STOP, EVEN_PAD_DATA, TEST_BATCH_SIZE
 
 BATCH_COMPRESSED = 0
 BATCH_TARGET = 1
@@ -30,7 +30,7 @@ class JPEGDataset(object):
             self.ds = self.ds = tfds.load('div2k_preprocessed', data_dir=DATASETS_DIR, shuffle_files=True,
                                           split='validation', batch_size=batch_size)
         elif dataset_type == 'test':
-            self.ds = tfds.load('urban100_dataset', data_dir=DATASETS_DIR)['test']
+            self.ds = tfds.load('urban100_dataset', data_dir=DATASETS_DIR, batch_size=TEST_BATCH_SIZE)['test']
 
         self.ds = self.ds.prefetch(DATASET_PREFETCH)
         self.ds_iter = iter(self.ds)
@@ -92,7 +92,6 @@ def preprocessDataForSTRRN(batch):
         originalTarget = batch[1][b]
         targetStructure = l0_gradient_minimization_2d(originalTarget, lmd=L0_GRADIENT_MIN_LAMDA,
                                                       beta_max=L0_GRADIENT_MIN_BETA_MAX)
-        targetStructure = np.clip(targetStructure, a_min=0.0, a_max=1.0)
         targetTexture = np.subtract(originalTarget, targetStructure)
 
         structure_target.append(targetStructure)

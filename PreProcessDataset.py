@@ -1,6 +1,8 @@
+import shutil
 from io import BytesIO
 
 from PIL import Image
+from multiprocessing import Pool
 
 import os
 import numpy as np
@@ -8,17 +10,19 @@ import numpy as np
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 from modules.NNConfig import L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX, JPEG_QUALITY
 
-DATASET_PATH = 'e:/datasets/div2k_dataset/downloads/extracted/'
-OUTPUT_PATH = 'e:/datasets/div2k_dataset/preprocessed/'
+DATASET_PATH = 'e:/datasets/urban100/'
+OUTPUT_PATH = 'e:/datasets/urban100_dataset/preprocessed/image_SRF_2/'
 
-FILE_SUFFIX = '.png'
+FILE_SUFFIX = 'HR.png'
 
 PATCH_SIZE = 31
 STRIDE = 21
 
-SEGMENT_IMAGES = True
-AUGMENT_IMAGES = True
+SEGMENT_IMAGES = False
+AUGMENT_IMAGES = False
 STRRN_PREPROCESSING = True
+
+SKIP = -1
 
 
 def STRRN_processing_and_save(original, compressed, out_dir, count):
@@ -27,14 +31,12 @@ def STRRN_processing_and_save(original, compressed, out_dir, count):
     compressedStructure = l0_gradient_minimization_2d(originalCompressed,
                                                       lmd=L0_GRADIENT_MIN_LAMDA,
                                                       beta_max=L0_GRADIENT_MIN_BETA_MAX)
-    compressedStructure = np.clip(compressedStructure, a_min=0.0, a_max=1.0)
     compressedTexture = np.subtract(originalCompressed, compressedStructure)
 
     # process target data
     originalTarget = original / 255.0
     targetStructure = l0_gradient_minimization_2d(originalTarget, lmd=L0_GRADIENT_MIN_LAMDA,
                                                   beta_max=L0_GRADIENT_MIN_BETA_MAX)
-    targetStructure = np.clip(targetStructure, a_min=0.0, a_max=1.0)
     targetTexture = np.subtract(originalTarget, targetStructure)
 
     originalTarget = originalTarget.astype('float32')
@@ -44,12 +46,12 @@ def STRRN_processing_and_save(original, compressed, out_dir, count):
     targetStructure = targetStructure.astype('float32')
     targetTexture = targetTexture.astype('float32')
 
-    originalTarget.tofile(out_dir + str(count) + ".original.ndarray")
-    originalCompressed.tofile(out_dir + str(count) + ".compressed.ndarray")
-    compressedStructure.tofile(out_dir + str(count) + ".compressed_structure.ndarray")
-    compressedTexture.tofile(out_dir + str(count) + ".compressed_texture.ndarray")
-    targetStructure.tofile(out_dir + str(count) + ".target_structure.ndarray")
-    targetTexture.tofile(out_dir + str(count) + ".target_texture.ndarray")
+    np.save(out_dir + str(count) + ".original", originalTarget)
+    np.save(out_dir + str(count) + ".compressed", originalCompressed)
+    np.save(out_dir + str(count) + ".compressed_structure", compressedStructure)
+    np.save(out_dir + str(count) + ".compressed_texture", compressedTexture)
+    np.save(out_dir + str(count) + ".target_structure", targetStructure)
+    np.save(out_dir + str(count) + ".target_texture", targetTexture)
 
 
 def saveImages(img, out_dir, count):
@@ -68,63 +70,92 @@ def saveImages(img, out_dir, count):
         originalTarget = originalTarget.astype('float32')
         originalCompressed = originalCompressed.astype('float32')
 
-        originalTarget.tofile(out_dir + str(count) + ".original.ndarray")
-        originalCompressed.tofile(out_dir + str(count) + ".compressed.ndarray")
+        np.save(out_dir + str(count) + ".original", originalTarget)
+        np.save(out_dir + str(count) + ".compressed", originalCompressed)
+
+
+def process(r, file, image_num):
+    imgs = []
+    out_dir = OUTPUT_PATH + os.path.splitext(os.path.basename(file))[0]
+
+    # open file and augment data
+    if os.path.exists(out_dir):
+        return
+    if os.path.exists(out_dir + "_tmp"):
+        shutil.rmtree(out_dir + "_tmp")
+
+    image_file = Image.open(r + "/" + file)
+    imgs.append(np.asarray(image_file))
+    if AUGMENT_IMAGES:
+        imgs.append(np.asarray(image_file.rotate(90, expand=True)))
+        imgs.append(np.asarray(image_file.rotate(180, expand=True)))
+        imgs.append(np.asarray(image_file.rotate(270, expand=True)))
+        imgs.append(np.asarray(image_file.transpose(Image.FLIP_LEFT_RIGHT)))
+        imgs.append(np.asarray(image_file.transpose(Image.FLIP_TOP_BOTTOM)))
+
+    if not os.path.exists(out_dir + "_tmp"):
+        os.mkdir(out_dir + "_tmp")
+
+    imgs = np.asarray(imgs)
+
+    # spit images into tiles
+
+    count = 0
+    for image in imgs:
+        x_stride = 0
+        y_stride = 0
+
+        if SEGMENT_IMAGES:
+            while x_stride < image.shape[0] - PATCH_SIZE - 1:
+                while y_stride < image.shape[1] - PATCH_SIZE - 1:
+                    tmp = image[x_stride:(x_stride + PATCH_SIZE), y_stride:(y_stride + PATCH_SIZE), ...]
+
+                    saveImages(tmp, out_dir + "_tmp/", count)
+
+                    count += 1
+
+                    y_stride += STRIDE
+                x_stride += STRIDE
+        else:
+            saveImages(image, out_dir + "_tmp/", count)
+            count += 1
+
+    os.rename(src=out_dir + "_tmp", dst=out_dir)
+    print("Finished processing image " + str(image_num))
+
+
+ready_list = []
+
+
+def callback(arg):
+    global ready_list
+    ready_list.append(arg)
 
 
 def preprocess():
     # find all files
     if not os.path.exists(OUTPUT_PATH):
         os.mkdir(OUTPUT_PATH)
+
+    files = []
     for r, d, f in os.walk(DATASET_PATH):
-        images = 0
+        image_num = 0
         for file in f:
+            if image_num < SKIP:
+                image_num += 1
+                continue
+
             if FILE_SUFFIX in file:
+                files.append((r, file, image_num))
+                image_num += 1
 
-                imgs = []
+    with Pool(processes=20, maxtasksperchild=4) as p:
+        print(p.starmap(func=process, iterable=files))
 
-                # open file and augment data
-                image_file = Image.open(r + "/" + file)
-                imgs.append(np.asarray(image_file))
-                if AUGMENT_IMAGES:
-                    imgs.append(np.asarray(image_file.rotate(90, expand=True)))
-                    imgs.append(np.asarray(image_file.rotate(180, expand=True)))
-                    imgs.append(np.asarray(image_file.rotate(270, expand=True)))
-                    imgs.append(np.asarray(image_file.transpose(Image.FLIP_LEFT_RIGHT)))
-                    imgs.append(np.asarray(image_file.transpose(Image.FLIP_TOP_BOTTOM)))
-
-                out_dir = OUTPUT_PATH + os.path.splitext(os.path.basename(file))[0] + "/"
-                if not os.path.exists(out_dir):
-                    os.mkdir(out_dir)
-
-                imgs = np.asarray(imgs)
-
-                # spit images into tiles
-
-                count = 0
-                for image in imgs:
-                    x_stride = 0
-                    y_stride = 0
-
-                    if SEGMENT_IMAGES:
-                        while x_stride < image.shape[0] - PATCH_SIZE - 1:
-                            while y_stride < image.shape[1] - PATCH_SIZE - 1:
-                                tmp = image[x_stride:(x_stride + PATCH_SIZE), y_stride:(y_stride + PATCH_SIZE), ...]
-
-                                saveImages(tmp, out_dir, count)
-
-                                count += 1
-
-                                y_stride += STRIDE
-                            x_stride += STRIDE
-                    else:
-                        saveImages(image, out_dir, count)
-                        count += 1
-
-                print("Finished processing image " + str(images) + " ", end="\r")
-                images += 1
-
+    p.close()
+    p.join()
     print("Finished all pre-processing")
 
 
-preprocess()
+if __name__ == '__main__':
+    preprocess()

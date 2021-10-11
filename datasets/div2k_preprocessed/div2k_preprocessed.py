@@ -1,6 +1,7 @@
 """div2k_preprocessed dataset."""
 
 import tensorflow_datasets as tfds
+import tensorflow as tf
 import numpy as np
 
 from PIL import Image
@@ -32,12 +33,15 @@ class Div2kPreprocessed(tfds.core.GeneratorBasedBuilder):
             description=_DESCRIPTION,
             features=tfds.features.FeaturesDict({
                 # These are the features of your dataset like images, labels ...
-                'original': tfds.features.Image(shape=(None, None, 3)),
-                'target_structure': tfds.features.Image(shape=(None, None, 3)),
-                'target_texture': tfds.features.Image(shape=(None, None, 3)),
-                'compressed_structure': tfds.features.Image(shape=(None, None, 3)),
-                'compressed_texture': tfds.features.Image(shape=(None, None, 3)),
-                'compressed': tfds.features.Image(shape=(None, None, 3))
+                'original': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
+                'target_structure': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
+                                                         encoding='zlib'),
+                'target_texture': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
+                'compressed_structure': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
+                                                             encoding='zlib'),
+                'compressed_texture': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
+                                                           encoding='zlib'),
+                'compressed': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib')
             }),
             # If there's a common (input, target) tuple from the
             # features, specify them here. They'll be used if
@@ -49,6 +53,7 @@ class Div2kPreprocessed(tfds.core.GeneratorBasedBuilder):
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Returns SplitGenerators."""
+
         path_train = Path("e:/datasets/div2k_dataset/preprocessed/train")
         path_validation = Path("e:/datasets/div2k_dataset/preprocessed/validation")
 
@@ -59,17 +64,16 @@ class Div2kPreprocessed(tfds.core.GeneratorBasedBuilder):
 
     def _generate_examples(self, path):
         """Yields examples."""
-        for f in path.glob('*original.ndarray'):
-            original = np.fromfile(str(f), dtype="float32")
-            original = np.asarray(original)
+        for f in path.glob('*/*original.npy'):
+            original = np.load(str(f))
 
-            baseName = str(f).replace("original.ndarray", "")
+            baseName = str(f).replace("original.npy", "")
 
-            target_structure = np.fromfile(baseName + "target_structure.ndarray", dtype="float32")
-            target_texture = np.fromfile(baseName + "target_texture.ndarray", dtype="float32")
-            compressed_structure = np.fromfile(baseName + "compressed_structure.ndarray", dtype="float32")
-            compressed_texture = np.fromfile(baseName + "compressed_texture.ndarray", dtype="float32")
-            compressed = np.fromfile(baseName + "compressed.ndarray", dtype="float32")
+            target_structure = np.load(baseName + "target_structure.npy")
+            target_texture = np.load(baseName + "target_texture.npy")
+            compressed_structure = np.load(baseName + "compressed_structure.npy")
+            compressed_texture = np.load(baseName + "compressed_texture.npy")
+            compressed = np.load(baseName + "compressed.npy")
 
             yield str(f), {
                 'original': original,
