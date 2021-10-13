@@ -50,7 +50,7 @@ def MGE_MSE_combinedLoss(outputs, targets):
     mge = MeanGradientError(outputs, targets)
     mse = tf.losses.mse(targets, outputs)
 
-    out = 0.9 * float(mge) + mse  # leave mge cast to float. NN seems to explode (NaN's) if mge is left as-is
+    out = 0.2 * float(mge) + mse  # leave mge cast to float. NN seems to explode (NaN's) if mge is left as-is
     return out
 
 

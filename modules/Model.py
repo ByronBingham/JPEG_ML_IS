@@ -3,7 +3,7 @@ import tensorflow as tf
 from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, ReLU, Add, Activation, Conv2DTranspose, Layer, \
     Dropout
 from modules.NNConfig import INPUT_SHAPE, MPRRN_FILTERS_PER_LAYER, MPRRN_FILTER_SHAPE, MPRRN_RRU_PER_IRB, MPRRN_IRBS, \
-    DROPOUT_RATE
+    DROPOUT_RATE, STRUCTURE_FILTERS_PER_LAYER, TEXTURE_FILTERS_PER_LAYER
 
 
 def EQLRI_model():
@@ -62,11 +62,11 @@ def STRRN():
     return model
 
 
-def MPRRN(inputs, rrusPerIrb, irbCount):
-    conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(inputs)
+def MPRRN(inputs, rrusPerIrb, irbCount, filtersPerLayer=MPRRN_FILTERS_PER_LAYER):
+    conv_1 = Conv2D(filters=filtersPerLayer, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(inputs)
 
-    conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
-    conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+    conv_2 = Conv2D(filters=filtersPerLayer, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+    conv_3 = Conv2D(filters=filtersPerLayer, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
 
     irbs = []
     sums = []
@@ -224,6 +224,27 @@ def MPRRN_only():
     return model
 
 
+def MPRRN_structure():
+    inputs = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    mprrn = MPRRN(inputs, rrusPerIrb=MPRRN_RRU_PER_IRB, irbCount=MPRRN_IRBS,
+                  filtersPerLayer=STRUCTURE_FILTERS_PER_LAYER)
+
+    model = tf.keras.Model(inputs=inputs, outputs=mprrn)
+
+    return model
+
+
+def MPRRN_texture():
+    inputs = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    mprrn = MPRRN(inputs, rrusPerIrb=MPRRN_RRU_PER_IRB, irbCount=MPRRN_IRBS, filtersPerLayer=TEXTURE_FILTERS_PER_LAYER)
+
+    model = tf.keras.Model(inputs=inputs, outputs=mprrn)
+
+    return model
+
+
 def MPRRN_only_encodeDecode():
     inputs = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
 
@@ -361,6 +382,8 @@ modelSwitch = {
     'strrn': STRRN,
     'strrn_encodedecode': STRRN_encodeDecode,
     'mprrn_only': MPRRN_only,
+    'mprrn_structure': MPRRN_structure,
+    'mprrn_texture': MPRRN_texture,
     'mprrn_encodedecode': MPRRN_only_encodeDecode,
     'mprrn_encodedecode_4layer': MPRRN_only_encodeDecode_4layer,
     'strrn_no_irb_residual': STRRN_no_IRB_residual,

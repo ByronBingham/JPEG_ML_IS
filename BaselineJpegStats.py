@@ -9,27 +9,32 @@ total_psnr_structure = 0.0
 total_ssim_structure = 0.0
 total_psnr_texture = 0.0
 total_ssim_texture = 0.0
-total_psnr =0.0
-total_ssim = 0.0
+total_strrn_psnr = 0.0
+total_strrn_ssim = 0.0
 
 examples = 0
 for example in ds:
+    original = example['original']
+    target_structure = example['target_structure']
+    target_texture = example['target_texture']
+    compressed_structure = example['compressed_structure']
+    compressed_texture = example['compressed_texture']
+    compressed = example['compressed']
 
-    structure_in, texture_in, structure_target, texture_target = preprocessDataForSTRRN(example)
+    total_psnr_structure += np.average(tf.image.psnr(compressed_structure, target_structure, max_val=1.0))
+    total_ssim_structure += np.average(tf.image.ssim(compressed_structure, target_structure, max_val=1.0))
 
-    total_psnr_structure += np.average(tf.image.psnr(structure_in, structure_target, max_val=1.0))
-    total_psnr_texture += np.average(tf.image.psnr(texture_in, texture_target, max_val=1.0))
+    total_psnr_texture += np.average(tf.image.psnr(compressed_texture, target_texture, max_val=1.0))
+    total_ssim_texture += np.average(tf.image.ssim(compressed_texture, target_texture, max_val=1.0))
 
-    total_ssim_structure += np.average(tf.image.ssim(structure_in, structure_target, max_val=1.0))
-    total_ssim_texture += np.average(tf.image.ssim(texture_in, texture_target, max_val=1.0))
+    total_strrn_psnr += np.average(tf.image.psnr(compressed, original, max_val=1.0))
+    total_strrn_ssim += np.average(tf.image.ssim(compressed, original, max_val=1.0))
 
-    total_psnr += np.average(tf.image.psnr(example[0], example[1], max_val=1.0))
-    total_ssim += np.average(tf.image.ssim(example[0], example[1], max_val=1.0))
     examples += 1
 
 print("Average PSNR(structure) of test dataset: " + str(total_psnr_structure / examples))
 print("Average SSIM(structure) of test dataset: " + str(total_ssim_structure / examples))
 print("Average PSNR(texture) of test dataset: " + str(total_psnr_texture / examples))
 print("Average SSIM(texture) of test dataset: " + str(total_ssim_texture / examples))
-print("Average PSNR of test dataset: " + str(total_psnr / examples))
-print("Average SSIM of test dataset: " + str(total_ssim / examples))
+print("Average PSNR(STRRRN) of test dataset: " + str(total_strrn_psnr / examples))
+print("Average SSIM(STRRRN) of test dataset: " + str(total_strrn_ssim / examples))

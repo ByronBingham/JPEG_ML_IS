@@ -41,7 +41,7 @@ class TrainNN:
     def __init__(self):
         TF_Init()
 
-        if NN_MODEL == 'strrn':
+        if NN_MODEL in 'strrn mprrn_only':
             self.info = NN_MODEL + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(
                 MPRRN_IRBS) + "_QL" + str(
                 JPEG_QUALITY) + "_L0Lmb" + str(L0_GRADIENT_MIN_LAMDA)
@@ -51,12 +51,13 @@ class TrainNN:
         if DATASET_EARLY_STOP:
             self.info = "minirun_" + self.info
 
-        if NN_MODEL == 'mprrn_only' and (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
+        if NN_MODEL == 'mprrn_only' and (
+                MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture' or MPRRN_TRAINING == 'aggregator'):
             self.info = MPRRN_TRAINING + self.info
 
         self.info = self.info + "_QL" + str(JPEG_QUALITY) + "filterShape" + "_batchSize" + str(
             BATCH_SIZE) + "_learningRate" + str(
-            LEARNING_RATE) + str(MPRRN_FILTER_SHAPE)
+            LEARNING_RATE) + "_filterShape" + str(MPRRN_FILTER_SHAPE)
 
         self.saveFile = self.info + ".save"
         self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
@@ -82,14 +83,20 @@ class TrainNN:
         self.models = [Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL]()]
         self.models = np.asarray(self.models)
 
-        self.structureModel = None
-        self.textureModel = None
+        self.structureModels = []
+        self.textureModels = []
 
         if NN_MODEL == 'mprrn_only' and MPRRN_TRAINING == 'aggregator':
-            self.structureModel = Model.modelSwitch[NN_MODEL]()
-            self.textureModel = Model.modelSwitch[NN_MODEL]()
-            self.structureModel.load_weights(PRETRAINED_MPRRN_PATH + PRETRAINED_STRUCTURE)
-            self.textureModel.load_weights(PRETRAINED_MPRRN_PATH + PRETRAINED_TEXTURE)
+            for c in range(3):
+                self.structureModels.append(Model.modelSwitch['mprrn_structure']())
+                self.textureModels.append(Model.modelSwitch['mprrn_texture']())
+                self.structureModels[c].load_weights(
+                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + PRETRAINED_STRUCTURE)
+                self.textureModels[c].load_weights(
+                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + PRETRAINED_TEXTURE)
+
+            self.structureModels = np.asarray(self.structureModels)
+            self.textureModels = np.asarray(self.textureModels)
 
         self.startingEpoch = 0
         self.best_psnr = 0.0
@@ -122,8 +129,8 @@ class TrainNN:
         texture_out = None
 
         if NN_MODEL == 'mprrn_only' and MPRRN_TRAINING == 'aggregator':
-            structure_out = self.structureModel(compressed_structure[..., c:c + 1])
-            texture_out = self.textureModel(compressed_texture[..., c:c + 1])
+            structure_out = self.structureModels[c](compressed_structure[..., c:c + 1])
+            texture_out = self.textureModels[c](compressed_texture[..., c:c + 1])
         if NN_MODEL in DUAL_CHANNEL_MODELS:
             model_out = self.models[c]([compressed_structure[..., c:c + 1], compressed_texture[..., c:c + 1]],
                                        training=True)
@@ -133,7 +140,8 @@ class TrainNN:
             elif MPRRN_TRAINING == 'texture':
                 model_out = self.models[c](compressed_texture[..., c:c + 1], training=True)
             elif MPRRN_TRAINING == 'aggregator':
-                model_out = self.models[c]([structure_out, texture_out])
+                agg_in = np.add(structure_out, texture_out)
+                model_out = self.models[c](agg_in)
 
         else:
             model_out = self.models[c](compressed[..., c:c + 1], training=True)
@@ -157,6 +165,11 @@ class TrainNN:
                 loss = JPEGLoss(model_out, target_texture[..., c:c + 1], compressed_texture[..., c:c + 1])
                 psnr = tf.image.psnr(target_texture[..., c:c + 1], model_out, max_val=1.0)
                 ssim = tf.image.ssim(target_texture[..., c:c + 1], model_out, max_val=1.0)
+            elif MPRRN_TRAINING == 'aggregator':
+                loss = JPEGLoss(model_out, original[..., c:c + 1], compressed[..., c:c + 1])
+                psnr = tf.image.psnr(original[..., c:c + 1], model_out, max_val=1.0)
+                ssim = tf.image.ssim(original[..., c:c + 1], model_out, max_val=1.0)
+
         else:
             loss = JPEGLoss(model_out, original[..., c:c + 1], compressed[..., c:c + 1])
             psnr = tf.image.psnr(original[..., c:c + 1], model_out, max_val=1.0)
@@ -353,7 +366,8 @@ class TrainNN:
                                       constant_values=0)
 
             structureIn, textureIn = None, None
-            if (NN_MODEL in DUAL_CHANNEL_MODELS) or (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
+            if (NN_MODEL in DUAL_CHANNEL_MODELS) or (
+                    MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture' or MPRRN_TRAINING == 'aggregator'):
                 structureIn, textureIn = preprocessInputsForSTRRN(np.asarray(nn_input))
 
             channels_out = []
