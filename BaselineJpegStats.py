@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+from PIL import Image, ImageOps
 
 from modules.Dataset import JPEGDataset, preprocessDataForSTRRN
 
@@ -20,6 +21,22 @@ for example in ds:
     compressed_structure = example['compressed_structure']
     compressed_texture = example['compressed_texture']
     compressed = example['compressed']
+
+    '''
+    org_mono = np.asarray(original[0]) * 255.0
+    org_mono = org_mono.astype('uint8')
+    org_mono = Image.fromarray(org_mono)
+    org_mono = ImageOps.grayscale(org_mono)
+    org_mono = np.asarray(org_mono) / 255.0
+    org_mono = np.expand_dims(org_mono, axis=-1)
+
+    cmp_mono = np.asarray(compressed[0]) * 255.0
+    cmp_mono = cmp_mono.astype('uint8')
+    cmp_mono = Image.fromarray(cmp_mono)
+    cmp_mono = ImageOps.grayscale(cmp_mono)
+    cmp_mono = np.asarray(cmp_mono) / 255.0
+    cmp_mono = np.expand_dims(cmp_mono, axis=-1)
+    '''
 
     total_psnr_structure += np.average(tf.image.psnr(compressed_structure, target_structure, max_val=1.0))
     total_ssim_structure += np.average(tf.image.ssim(compressed_structure, target_structure, max_val=1.0))

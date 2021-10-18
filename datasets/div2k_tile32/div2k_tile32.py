@@ -1,8 +1,8 @@
-"""urban100_dataset dataset."""
+"""div2k_preprocessed dataset."""
 
 import tensorflow_datasets as tfds
-import numpy as np
 import tensorflow as tf
+import numpy as np
 
 from PIL import Image
 from Lib.pathlib import Path
@@ -18,12 +18,13 @@ _CITATION = """
 """
 
 
-class Urban100Dataset(tfds.core.GeneratorBasedBuilder):
-    """DatasetBuilder for urban100_dataset dataset."""
+class Div2kTile32(tfds.core.GeneratorBasedBuilder):
+    """DatasetBuilder for div2k_tile32 dataset."""
 
-    VERSION = tfds.core.Version('1.0.0')
+    VERSION = tfds.core.Version('1.1.0')
     RELEASE_NOTES = {
         '1.0.0': 'Initial release.',
+        '1.1.0': 'Added difference feature.',
     }
 
     def _info(self) -> tfds.core.DatasetInfo:
@@ -41,7 +42,8 @@ class Urban100Dataset(tfds.core.GeneratorBasedBuilder):
                                                              encoding='zlib'),
                 'compressed_texture': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
                                                            encoding='zlib'),
-                'compressed': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib')
+                'compressed': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
+                'diff': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib')
             }),
             # If there's a common (input, target) tuple from the
             # features, specify them here. They'll be used if
@@ -54,10 +56,12 @@ class Urban100Dataset(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Returns SplitGenerators."""
 
-        path = Path("e:/datasets/urban100_dataset/preprocessed/image_SRF_2")
+        path_train = Path("e:/datasets/div2k_dataset/preprocessed/tile32/train")
+        path_validation = Path("e:/datasets/div2k_dataset/preprocessed/tile32/validation")
 
         return {
-            'test': self._generate_examples(path),
+            'train': self._generate_examples(path_train),
+            'validation': self._generate_examples(path_validation)
         }
 
     def _generate_examples(self, path):
@@ -72,6 +76,7 @@ class Urban100Dataset(tfds.core.GeneratorBasedBuilder):
             compressed_structure = np.load(baseName + "compressed_structure.npy")
             compressed_texture = np.load(baseName + "compressed_texture.npy")
             compressed = np.load(baseName + "compressed.npy")
+            diff = np.load(baseName + "diff.npy")
 
             yield str(f), {
                 'original': original,
@@ -79,5 +84,6 @@ class Urban100Dataset(tfds.core.GeneratorBasedBuilder):
                 'target_texture': target_texture,
                 'compressed_structure': compressed_structure,
                 'compressed_texture': compressed_texture,
-                'compressed': compressed
+                'compressed': compressed,
+                'diff': diff
             }

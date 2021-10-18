@@ -2,8 +2,11 @@ import tensorflow_datasets as tfds
 import tensorflow as tf
 import numpy as np
 import random as rand
-import datasets.urban100_dataset
+import datasets.urban100_dataset_2x
+import datasets.urban100_dataset_4x
+import datasets.urban100_dataset_all
 import datasets.div2k_preprocessed
+import datasets.div2k_tile32
 
 from PIL import Image
 from io import BytesIO
@@ -24,13 +27,13 @@ class JPEGDataset(object):
         self.batch_size = batch_size
 
         if dataset_type == 'train':
-            self.ds = self.ds = tfds.load('div2k_preprocessed', data_dir=DATASETS_DIR, shuffle_files=True,
+            self.ds = self.ds = tfds.load('div2k_tile32', data_dir=DATASETS_DIR, shuffle_files=True,
                                           split='train', batch_size=batch_size)
         elif dataset_type == 'validation':
-            self.ds = self.ds = tfds.load('div2k_preprocessed', data_dir=DATASETS_DIR, shuffle_files=True,
+            self.ds = self.ds = tfds.load('div2k_tile32', data_dir=DATASETS_DIR, shuffle_files=True,
                                           split='validation', batch_size=batch_size)
         elif dataset_type == 'test':
-            self.ds = tfds.load('urban100_dataset', data_dir=DATASETS_DIR, batch_size=TEST_BATCH_SIZE)['test']
+            self.ds = tfds.load('urban100_dataset4x', data_dir=DATASETS_DIR, batch_size=TEST_BATCH_SIZE)['test']
 
         self.ds = self.ds.prefetch(DATASET_PREFETCH)
         self.ds_iter = iter(self.ds)

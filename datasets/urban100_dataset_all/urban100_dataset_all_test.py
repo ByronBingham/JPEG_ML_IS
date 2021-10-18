@@ -1,13 +1,13 @@
-"""urban100_dataset dataset."""
+"""urban100_dataset_all dataset."""
 
 import tensorflow_datasets as tfds
-from . import urban100_dataset
+from . import urban100_dataset_all
 
 
-class Urban100DatasetTest(tfds.testing.DatasetBuilderTestCase):
-  """Tests for urban100_dataset dataset."""
-  # TODO(urban100_dataset):
-  DATASET_CLASS = urban100_dataset.Urban100Dataset
+class Urban100DatasetAllTest(tfds.testing.DatasetBuilderTestCase):
+  """Tests for urban100_dataset_all dataset."""
+  # TODO(urban100_dataset_all):
+  DATASET_CLASS = urban100_dataset_all.Urban100DatasetAll
   SPLITS = {
       'train': 3,  # Number of fake train example
       'test': 1,  # Number of fake test example

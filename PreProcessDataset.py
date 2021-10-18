@@ -10,16 +10,17 @@ import numpy as np
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 from modules.NNConfig import L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX, JPEG_QUALITY
 
-DATASET_PATH = 'e:/datasets/urban100/'
-OUTPUT_PATH = 'e:/datasets/urban100_dataset/preprocessed/image_SRF_2/'
+DATASET_PATH = 'e:/datasets/div2k_dataset/downloads/extracted/'
+OUTPUT_PATH = 'e:/datasets/urban100_dataset/preprocessed/image_SRF_4'
 
-FILE_SUFFIX = 'HR.png'
+FILE_SUFFIX = '.png'
+DIFF_FILE_SUFFIX = '.original.npy'
 
-PATCH_SIZE = 31
+PATCH_SIZE = 32
 STRIDE = 21
 
-SEGMENT_IMAGES = False
-AUGMENT_IMAGES = False
+SEGMENT_IMAGES = True
+AUGMENT_IMAGES = True
 STRRN_PREPROCESSING = True
 
 SKIP = -1
@@ -149,7 +150,7 @@ def preprocess():
                 files.append((r, file, image_num))
                 image_num += 1
 
-    with Pool(processes=20, maxtasksperchild=4) as p:
+    with Pool(processes=15, maxtasksperchild=4) as p:
         print(p.starmap(func=process, iterable=files))
 
     p.close()
@@ -157,5 +158,46 @@ def preprocess():
     print("Finished all pre-processing")
 
 
+def diffProcess(r, file, image_num):
+    baseFileName = file.replace('.original.npy', '')
+
+    original = np.load(r + "/" + file)
+    compressed = np.load(r + "/" + baseFileName + '.compressed.npy')
+
+    diff = original - compressed
+
+    np.save(file=r + "/" + baseFileName + '.diff', arr=diff)
+
+    print("Finished processing image " + str(image_num))
+
+
+def preProcessDiffs():
+    # find all files
+    if not os.path.exists(OUTPUT_PATH):
+        os.mkdir(OUTPUT_PATH)
+
+    files = []
+    image_num = 0
+    for r, d, f in os.walk(OUTPUT_PATH):
+        for file in f:
+            if image_num < SKIP:
+                image_num += 1
+                continue
+
+            if DIFF_FILE_SUFFIX in file:
+                files.append((r, file, image_num))
+                image_num += 1
+
+    print("Total files found: " + str(image_num))
+
+    with Pool(processes=15, maxtasksperchild=4) as p:
+        p.starmap(func=diffProcess, iterable=files)
+
+    p.close()
+    p.join()
+    print("Finished all pre-processing")
+
+
 if __name__ == '__main__':
-    preprocess()
+    # preprocess()
+    preProcessDiffs()

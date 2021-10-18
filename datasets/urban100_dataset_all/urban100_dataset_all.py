@@ -1,8 +1,8 @@
-"""div2k_preprocessed dataset."""
+"""urban100_dataset_all dataset."""
 
 import tensorflow_datasets as tfds
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
 from PIL import Image
 from Lib.pathlib import Path
@@ -18,8 +18,8 @@ _CITATION = """
 """
 
 
-class Div2kPreprocessed(tfds.core.GeneratorBasedBuilder):
-    """DatasetBuilder for urban100_dataset_2x dataset."""
+class Urban100DatasetAll(tfds.core.GeneratorBasedBuilder):
+    """DatasetBuilder for urban100_dataset_all dataset."""
 
     VERSION = tfds.core.Version('1.0.0')
     RELEASE_NOTES = {
@@ -54,12 +54,10 @@ class Div2kPreprocessed(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Returns SplitGenerators."""
 
-        path_train = Path("e:/datasets/div2k_dataset/preprocessed/tile31/train")
-        path_validation = Path("e:/datasets/div2k_dataset/preprocessed/tile31/validation")
+        path = Path("e:/datasets/urban100_dataset/preprocessed/all")
 
         return {
-            'train': self._generate_examples(path_train),
-            'validation': self._generate_examples(path_validation)
+            'test': self._generate_examples(path),
         }
 
     def _generate_examples(self, path):
