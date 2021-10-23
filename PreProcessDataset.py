@@ -11,13 +11,13 @@ from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 from modules.NNConfig import L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX, JPEG_QUALITY
 
 DATASET_PATH = 'e:/datasets/div2k_dataset/downloads/extracted/'
-OUTPUT_PATH = 'e:/datasets/urban100_dataset/preprocessed/image_SRF_4'
+OUTPUT_PATH = 'e:/datasets/div2k_dataset/preprocessed/tile128/'
 
 FILE_SUFFIX = '.png'
 DIFF_FILE_SUFFIX = '.original.npy'
 
-PATCH_SIZE = 32
-STRIDE = 21
+PATCH_SIZE = 128
+STRIDE = 87
 
 SEGMENT_IMAGES = True
 AUGMENT_IMAGES = True
@@ -165,6 +165,9 @@ def diffProcess(r, file, image_num):
     compressed = np.load(r + "/" + baseFileName + '.compressed.npy')
 
     diff = original - compressed
+
+    if os.path.exists(r + "/" + baseFileName + '.diff.npy'):
+        os.remove(r + "/" + baseFileName + '.diff.npy')
 
     np.save(file=r + "/" + baseFileName + '.diff', arr=diff)
 

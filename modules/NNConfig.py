@@ -2,8 +2,8 @@
 # NN config
 #######################################
 INPUT_SHAPE = (None, None, 1)
-NN_MODEL = 'mprrn_only'
-DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode strrn_no_irb_residual strrn_no_irb_residual_encodedecode'
+NN_MODEL = 'dualchannelinterconnect'
+DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode strrn_no_irb_residual strrn_no_irb_residual_encodedecode dualchannelinterconnect'
 JPEG_QUALITY = 10
 
 # STRRN config
@@ -40,7 +40,6 @@ EPOCHS = 10
 LEARNING_RATE = 0.001
 LEARNING_RATE_DECAY_INTERVAL = 8
 LEARNING_RATE_DECAY = 10
-DATASET_PREFETCH = 3000
 
 GRAD_NORM = 1.0  # max value for gradients. Clipping gradients to prevent NaN issues
 ADAM_EPSILON = 0.001
@@ -56,20 +55,22 @@ else:
     ACCURACY_PSNR_THRESHOLD = 33.87
 
 BATCH_SIZE = 32
+DATASET_PREFETCH = BATCH_SIZE * 5
 TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
 DROPOUT_RATE = 0.2
 
-DATASET_EARLY_STOP = False
-TRAIN_EARLY_STOP = 1#1000    # number of batches
-VALIDATION_EARLY_STOP = 1#100
-TEST_EARLY_STOP = 1#100
+DATASET_EARLY_STOP = True
+TRAIN_EARLY_STOP = 1000  # number of batches
+VALIDATION_EARLY_STOP = 1
+TEST_EARLY_STOP = 100
 
-EVEN_PAD_DATA = 2  # should be powers of 2
+EVEN_PAD_DATA = 0  # should be powers of 2
 
-TRAIN_DIFF = True
+TRAIN_DIFF = False
 
 SAMPLE_IMAGES = ["sampleCartoonImage", "samplePhotoImage",
                  "sampleUrban100"]
 CHECKPOINTS_PATH = "./checkpoints/"
 DATASETS_DIR = "e:/datasets"
 TRAINING_DATASET = "e:/datasets/div2k_dataset/preprocessed/"
+RESULTS_DIR = "e:/savedResults"

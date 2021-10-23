@@ -3,12 +3,13 @@ import shutil
 import tensorflow as tf
 import numpy as np
 
+from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
     DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING, PRETRAINED_MPRRN_PATH, \
-    PRETRAINED_STRUCTURE, PRETRAINED_TEXTURE, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF
+    PRETRAINED_STRUCTURE, PRETRAINED_TEXTURE, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF, L0_GRADIENT_MIN_BETA_MAX
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessDataForSTRRN, \
     preprocessInputsForSTRRN
 from modules.Losses import JPEGLoss
@@ -41,7 +42,7 @@ class TrainNN:
     def __init__(self):
         TF_Init()
 
-        if NN_MODEL in 'strrn mprrn_only':
+        if NN_MODEL in 'strrn mprrn_only mprrn_encodedecode mprrn_encodedecode_4layer':
             self.info = NN_MODEL + "_MPRRNs" + str(MPRRN_RRU_PER_IRB) + "_IRBs" + str(
                 MPRRN_IRBS) + "_QL" + str(
                 JPEG_QUALITY) + "_L0Lmb" + str(L0_GRADIENT_MIN_LAMDA)
@@ -138,21 +139,19 @@ class TrainNN:
             structure_out = self.structureModels[c](compressed_structure[..., c:c + 1])
             texture_out = self.textureModels[c](compressed_texture[..., c:c + 1])
         if NN_MODEL in DUAL_CHANNEL_MODELS:
-            model_out = self.models[c]([compressed_structure[..., c:c + 1], compressed_texture[..., c:c + 1]],
-                                       training=True)
+            return self.models[c]([compressed_structure[..., c:c + 1], compressed_texture[..., c:c + 1]],
+                                  training=True)
 
         if MPRRN_TRAINING == 'structure':
-            model_out = self.models[c](compressed_structure[..., c:c + 1], training=True)
+            return self.models[c](compressed_structure[..., c:c + 1], training=True)
         elif MPRRN_TRAINING == 'texture':
-            model_out = self.models[c](compressed_texture[..., c:c + 1], training=True)
+            return self.models[c](compressed_texture[..., c:c + 1], training=True)
         elif MPRRN_TRAINING == 'aggregator':
             agg_in = np.add(structure_out, texture_out)
-            model_out = self.models[c](agg_in)
+            return self.models[c](agg_in)
 
         else:
-            model_out = self.models[c](compressed[..., c:c + 1], training=True)
-
-        return model_out
+            return self.models[c](compressed[..., c:c + 1], training=True)
 
     def get_model_out_and_metrics(self, c, batch):
         original = batch['original']
@@ -337,10 +336,47 @@ class TrainNN:
             self.best_psnr = avg_psnr
 
     @staticmethod
-    def sample_compress():
+    def sample_preprocess():
         for file in SAMPLE_IMAGES:
+            # compression
             pil_img = Image.open("./sampleImages/" + file + ".png")
             pil_img.save("./sampleImages/" + file + ".png" + ".compressed.jpg", format="JPEG", quality=JPEG_QUALITY)
+
+            # diff
+            original = np.asarray(pil_img) / 255.0
+            compressed = np.asarray(Image.open("./sampleImages/" + file + ".png" + ".compressed.jpg")) / 255.0
+            diff = original - compressed
+            diff = np.clip(diff, a_min=0.0, a_max=1.0)
+            diff = diff * 255.0
+            diff = diff.astype('uint8')
+            diff_img = Image.fromarray(diff)
+            diff_img.save("./sampleImages/" + file + ".png" + ".diff.jpg")
+
+            # smoothing
+            pil_img_c = Image.open("./sampleImages/" + file + ".png" + ".compressed.jpg")
+            pil_img_c = np.asarray(pil_img_c)
+            pil_img_c = pil_img_c / 255.0
+            smoothed_img_c = l0_gradient_minimization_2d(pil_img_c, lmd=L0_GRADIENT_MIN_LAMDA,
+                                                         beta_max=L0_GRADIENT_MIN_BETA_MAX)
+            smoothed_img_c = np.clip(smoothed_img_c, a_min=0.0, a_max=1.0)
+
+            smoothed_img_c = smoothed_img_c * 255.0
+            smoothed_img_c = smoothed_img_c.astype('uint8')
+            out = Image.fromarray(smoothed_img_c)
+            out.save("./sampleImages/" + file + ".png" + ".compressed.smoothed.png", format="PNG")
+
+            # uncompressed images
+            pil_img = Image.open("./sampleImages/" + file + ".png")
+            pil_img = np.asarray(pil_img)
+            pil_img = pil_img / 255.0
+            smoothed_img = l0_gradient_minimization_2d(pil_img, lmd=L0_GRADIENT_MIN_LAMDA,
+                                                       beta_max=L0_GRADIENT_MIN_BETA_MAX)
+            smoothed_img = np.clip(smoothed_img, a_min=0.0, a_max=1.0)
+
+            smoothed_img = smoothed_img * 255.0
+            smoothed_img = smoothed_img.astype('uint8')
+            out = Image.fromarray(smoothed_img)
+            out.save("./sampleImages/" + file + ".png" + ".smoothed.png", format="PNG")
 
     def sample_output_images(self, epoch):
         for file in SAMPLE_IMAGES:
@@ -468,9 +504,9 @@ class TrainNN:
         self.save_training_results()
 
 
-trainNn = TrainNN()
-trainNn.sample_compress()
+# TrainNN.sample_preprocess()
 
+trainNn = TrainNN()
 trainNn.train()
 
 # Init datasets

@@ -10,6 +10,8 @@ total_psnr_structure = 0.0
 total_ssim_structure = 0.0
 total_psnr_texture = 0.0
 total_ssim_texture = 0.0
+total_psnr_diff = 0.0
+total_ssim_diff = 0.0
 total_strrn_psnr = 0.0
 total_strrn_ssim = 0.0
 
