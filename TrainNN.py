@@ -9,7 +9,8 @@ from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_S
     ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
     DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING, PRETRAINED_MPRRN_PATH, \
-    PRETRAINED_STRUCTURE, PRETRAINED_TEXTURE, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF, L0_GRADIENT_MIN_BETA_MAX
+    PRETRAINED_STRUCTURE, PRETRAINED_TEXTURE, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF, L0_GRADIENT_MIN_BETA_MAX, \
+    USE_CPU_FOR_HIGH_MEMORY
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessDataForSTRRN, \
     preprocessInputsForSTRRN
 from modules.Losses import JPEGLoss
@@ -122,9 +123,15 @@ class TrainNN:
             self.do_epoch(epoch, learningRate)
             self.save_weights()
             print("\nEpoch " + str(epoch) + " finished. Starting test step\n")
-            self.do_test(epoch)
-            self.sample_output_images(epoch)
-            self.saveEpoch(epoch + 1)
+            if USE_CPU_FOR_HIGH_MEMORY:
+                with tf.device("CPU:0"):
+                    self.do_test(epoch)
+                    self.sample_output_images(epoch)
+                    self.saveEpoch(epoch + 1)
+            else:
+                self.do_test(epoch)
+                self.sample_output_images(epoch)
+                self.saveEpoch(epoch + 1)
 
     def get_model_out(self, c, batch):
         compressed_structure = batch['compressed_structure']

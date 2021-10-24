@@ -443,15 +443,19 @@ def MPRRN_only_w1x1():
     return model
 
 
-def DualChannelLayer(struct_in, text_in, struct_conv_1, struct_conv_2, text_conv_1, text_conv_2, one_by_conv):
+def DualChannelLayer_3(struct_in, text_in, struct_conv_1, struct_conv_2, text_conv_1, text_conv_2, struct_inter,
+                       text_inter, one_by_conv, struct_net_in, text_net_in):
     struct_rru = MPRRN_RRU(struct_in, struct_conv_1, struct_conv_2)
     text_rru = MPRRN_RRU(text_in, text_conv_1, text_conv_2)
 
     cat = Concatenate(axis=-1)([struct_rru, text_rru])
     comb_conv = one_by_conv(cat)
 
-    struct_out = Add()([struct_rru, comb_conv])
-    text_out = Add()([text_rru, comb_conv])
+    struct_inter_1 = struct_inter(cat)
+    text_inter_1 = text_inter(cat)
+
+    struct_out = Add()([struct_inter_1, comb_conv, struct_net_in])
+    text_out = Add()([text_inter_1, comb_conv, text_net_in])
 
     return struct_out, text_out
 
@@ -471,15 +475,22 @@ def DualChannelInterconnect():
     text_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
     text_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
 
+    struct_inter = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+    text_inter = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+
     one_by_conv = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=1, padding='same')
 
     layers = []
     for i in range(3):
         if i == 0:
-            layers.append(DualChannelLayer(struct_in, text_in, struct_conv_1, struct_conv_2, text_conv_1, text_conv_2, one_by_conv))
+            layers.append(DualChannelLayer_3(struct_in, text_in, struct_conv_1, struct_conv_2, text_conv_1, text_conv_2,
+                                             struct_inter,
+                                             text_inter, one_by_conv, struct_in, text_in))
         else:
-            layers.append(DualChannelLayer(layers[i-1][0], layers[i-1][1], struct_conv_1, struct_conv_2, text_conv_1, text_conv_2,
-                                           one_by_conv))
+            layers.append(
+                DualChannelLayer_3(layers[i - 1][0], layers[i - 1][1], struct_conv_1, struct_conv_2,
+                                   text_conv_1, text_conv_2, struct_inter,
+                                   text_inter, one_by_conv, struct_in, text_in))
 
     cat = Concatenate(axis=-1)(layers[-1])
 
@@ -506,5 +517,5 @@ modelSwitch = {
     'strrn_no_irb_residual_encodedecode': STRRN_no_IRB_residual_encodeDecode,
     'hourglass_6': hourglass_6,
     'mprrn_only_w1x1': MPRRN_only_w1x1,
-    'dualchannelinterconnect': DualChannelInterconnect
+    'dualchannelinterconnect_3': DualChannelInterconnect
 }

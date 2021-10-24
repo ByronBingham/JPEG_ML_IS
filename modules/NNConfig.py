@@ -2,8 +2,8 @@
 # NN config
 #######################################
 INPUT_SHAPE = (None, None, 1)
-NN_MODEL = 'dualchannelinterconnect'
-DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode strrn_no_irb_residual strrn_no_irb_residual_encodedecode dualchannelinterconnect'
+NN_MODEL = 'dualchannelinterconnect_3'
+DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode strrn_no_irb_residual strrn_no_irb_residual_encodedecode dualchannelinterconnect_3'
 JPEG_QUALITY = 10
 
 # STRRN config
@@ -36,6 +36,7 @@ L0_GRADIENT_MIN_BETA_MAX = 10000
 #######################################
 LOAD_WEIGHTS = False
 SAVE_AND_CONTINUE = True
+USE_CPU_FOR_HIGH_MEMORY = False
 EPOCHS = 10
 LEARNING_RATE = 0.001
 LEARNING_RATE_DECAY_INTERVAL = 8
@@ -59,16 +60,16 @@ DATASET_PREFETCH = BATCH_SIZE * 5
 TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
 DROPOUT_RATE = 0.2
 
-DATASET_EARLY_STOP = True
-TRAIN_EARLY_STOP = 1000  # number of batches
-VALIDATION_EARLY_STOP = 1
-TEST_EARLY_STOP = 100
+DATASET_EARLY_STOP = False
+TRAIN_EARLY_STOP = 1#1000  # number of batches
+VALIDATION_EARLY_STOP = 1#1
+TEST_EARLY_STOP = 1#100
 
 EVEN_PAD_DATA = 0  # should be powers of 2
 
 TRAIN_DIFF = False
 
-SAMPLE_IMAGES = ["sampleCartoonImage", "samplePhotoImage",
+SAMPLE_IMAGES = ["sampleCartoonImage", #"samplePhotoImage",
                  "sampleUrban100"]
 CHECKPOINTS_PATH = "./checkpoints/"
 DATASETS_DIR = "e:/datasets"
