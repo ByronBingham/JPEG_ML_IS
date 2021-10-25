@@ -503,6 +503,50 @@ def DualChannelInterconnect():
     return model
 
 
+def DualChannelInterconnect_struct_encodedecode():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_in = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(
+        structure_input)
+    text_in = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(
+        texture_input)
+
+    struct_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)
+    struct_conv_2 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                    strides=2)
+
+    text_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+    text_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+
+    struct_inter = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+    text_inter = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+
+    one_by_conv = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=1, padding='same')
+
+    layers = []
+    for i in range(3):
+        if i == 0:
+            layers.append(DualChannelLayer_3(struct_in, text_in, struct_conv_1, struct_conv_2, text_conv_1, text_conv_2,
+                                             struct_inter,
+                                             text_inter, one_by_conv, struct_in, text_in))
+        else:
+            layers.append(
+                DualChannelLayer_3(layers[i - 1][0], layers[i - 1][1], struct_conv_1, struct_conv_2,
+                                   text_conv_1, text_conv_2, struct_inter,
+                                   text_inter, one_by_conv, struct_in, text_in))
+
+    cat = Concatenate(axis=-1)(layers[-1])
+
+    aggr = MPRRN(inputs=cat, rrusPerIrb=1, irbCount=1)
+
+    out = Conv2D(filters=1, kernel_size=3, padding='same')(aggr)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
 modelSwitch = {
     'eqlri': EQLRI_model,
     'kerasexample': kerasExample_model,
@@ -517,5 +561,6 @@ modelSwitch = {
     'strrn_no_irb_residual_encodedecode': STRRN_no_IRB_residual_encodeDecode,
     'hourglass_6': hourglass_6,
     'mprrn_only_w1x1': MPRRN_only_w1x1,
-    'dualchannelinterconnect_3': DualChannelInterconnect
+    'dualchannelinterconnect_3': DualChannelInterconnect,
+    'dualchannelinterconnect_struct_encodedecode': DualChannelInterconnect_struct_encodedecode
 }
