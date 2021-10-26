@@ -2,9 +2,9 @@
 # NN config
 #######################################
 INPUT_SHAPE = (None, None, 1)
-NN_MODEL = 'dc_hourglass_interconnect'
+NN_MODEL = 'dc_hourglass_interconnect_2'
 DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode strrn_no_irb_residual strrn_no_irb_residual_encodedecode \
-                dualchannelinterconnect_4 dualchannelinterconnect_struct_encodedecode dc_hourglass_interconnect'
+                dualchannelinterconnect_4 dualchannelinterconnect_struct_encodedecode dc_hourglass_interconnect_2'
 JPEG_QUALITY = 10
 
 # STRRN config
