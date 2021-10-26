@@ -481,7 +481,7 @@ def DualChannelInterconnect():
     one_by_conv = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=1, padding='same')
 
     layers = []
-    for i in range(3):
+    for i in range(2):
         if i == 0:
             layers.append(DualChannelLayer_3(struct_in, text_in, struct_conv_1, struct_conv_2, text_conv_1, text_conv_2,
                                              struct_inter,
@@ -547,6 +547,79 @@ def DualChannelInterconnect_struct_encodedecode():
     return model
 
 
+def DC_Hourglass_Interconnect():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)(
+        structure_input)
+    text_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)(
+        texture_input)
+
+    struct_sum_1 = Add()([struct_conv_1, text_conv_1])
+    text_sum_1 = Add()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)(
+        struct_sum_1)
+    text_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)(
+        text_sum_1)
+
+    struct_sum_2 = Add()([struct_conv_2, text_conv_2])
+    text_sum_2 = Add()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)(
+        struct_sum_2)
+    text_conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)(
+        text_sum_2)
+
+    struct_sum_3 = Add()([struct_conv_3, text_conv_3])
+    text_sum_3 = Add()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(
+        struct_sum_3)
+    text_conv_4 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(
+        text_sum_3)
+
+    struct_sum_4 = Add()([struct_conv_4, text_conv_4])
+    text_sum_4 = Add()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                      strides=2)(struct_sum_4)
+    text_deconv_1 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                    strides=2)(text_sum_4)
+
+    struct_sum_5 = Add()([struct_deconv_1, text_deconv_1])
+    text_sum_5 = Add()([struct_deconv_1, text_deconv_1])
+
+    struct_deconv_2 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                      strides=2)(struct_sum_5)
+    text_deconv_2 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                    strides=2)(text_sum_5)
+
+    struct_sum_6 = Add()([struct_deconv_2, text_deconv_2])
+    text_sum_6 = Add()([struct_deconv_2, text_deconv_2])
+
+    struct_deconv_3 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                      strides=2)(struct_sum_6)
+    text_deconv_3 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                    strides=2)(text_sum_6)
+
+    struct_sum_7 = Add()([struct_deconv_3, text_deconv_3])
+    text_sum_7 = Add()([struct_deconv_3, text_deconv_3])
+
+    # Aggregate
+
+    agg_sum = Add()([struct_sum_7, text_sum_7])
+
+    aggr = MPRRN(inputs=agg_sum, rrusPerIrb=1, irbCount=1)
+
+    out = Conv2D(filters=1, kernel_size=1, padding='same')(aggr)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
 modelSwitch = {
     'eqlri': EQLRI_model,
     'kerasexample': kerasExample_model,
@@ -561,6 +634,7 @@ modelSwitch = {
     'strrn_no_irb_residual_encodedecode': STRRN_no_IRB_residual_encodeDecode,
     'hourglass_6': hourglass_6,
     'mprrn_only_w1x1': MPRRN_only_w1x1,
-    'dualchannelinterconnect_3': DualChannelInterconnect,
-    'dualchannelinterconnect_struct_encodedecode': DualChannelInterconnect_struct_encodedecode
+    'dualchannelinterconnect_4': DualChannelInterconnect,
+    'dualchannelinterconnect_struct_encodedecode': DualChannelInterconnect_struct_encodedecode,
+    'dc_hourglass_interconnect': DC_Hourglass_Interconnect
 }

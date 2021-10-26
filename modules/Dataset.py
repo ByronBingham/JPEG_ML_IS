@@ -64,6 +64,28 @@ class JPEGDataset(object):
 
         batch = next(self.ds_iter)
 
+        if EVEN_PAD_DATA > 1 and self.dataset_type == 'test' and TEST_BATCH_SIZE == 1:
+
+            new_batch = {}
+            for feature in batch:
+                batch[feature] = np.asarray(batch[feature])
+                for e in range(TEST_BATCH_SIZE):
+                    if (batch[feature][e].shape[0] % EVEN_PAD_DATA) != 0 or (
+                            batch[feature][e].shape[1] % EVEN_PAD_DATA) != 0:  # if shape is odd, pad to make even
+                        new_batch[feature] = np.asarray([np.pad(batch[feature][e],
+                                                                [(0, EVEN_PAD_DATA - (
+                                                                        batch[feature][e].shape[
+                                                                            0] % EVEN_PAD_DATA)),
+                                                                 (0, EVEN_PAD_DATA - (
+                                                                         batch[feature][e].shape[
+                                                                             1] % EVEN_PAD_DATA)),
+                                                                 (0, 0)],
+                                                                constant_values=0)])
+                    else:
+                        new_batch[feature] = np.asarray(batch[feature])
+
+            batch = new_batch
+
         self.batches += 1
 
         return batch
