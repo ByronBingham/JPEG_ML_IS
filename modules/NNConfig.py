@@ -61,7 +61,7 @@ DATASET_PREFETCH = BATCH_SIZE * 5
 TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
 DROPOUT_RATE = 0.2
 
-DATASET_EARLY_STOP = True
+DATASET_EARLY_STOP = False
 TRAIN_EARLY_STOP = 1000  # number of batches
 VALIDATION_EARLY_STOP = 1
 TEST_EARLY_STOP = 100

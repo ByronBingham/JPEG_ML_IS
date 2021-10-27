@@ -443,6 +443,19 @@ def MPRRN_only_w1x1():
     return model
 
 
+def DualChannelLayer(struct_in, text_in, struct_conv_1, struct_conv_2, text_conv_1, text_conv_2, one_by_conv):
+    struct_rru = MPRRN_RRU(struct_in, struct_conv_1, struct_conv_2)
+    text_rru = MPRRN_RRU(text_in, text_conv_1, text_conv_2)
+
+    cat = Concatenate(axis=-1)([struct_rru, text_rru])
+    comb_conv = one_by_conv(cat)
+
+    struct_out = Add()([struct_rru, comb_conv])
+    text_out = Add()([text_rru, comb_conv])
+
+    return struct_out, text_out
+
+
 def DualChannelLayer_3(struct_in, text_in, struct_conv_1, struct_conv_2, text_conv_1, text_conv_2, struct_inter,
                        text_inter, one_by_conv, struct_net_in, text_net_in):
     struct_rru = MPRRN_RRU(struct_in, struct_conv_1, struct_conv_2)
@@ -547,37 +560,165 @@ def DualChannelInterconnect_struct_encodedecode():
     return model
 
 
-def DC_Hourglass_Interconnect_3():
+def DualChannelInterconnect():
     structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
     texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
 
-    struct_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2, activation='relu')(
+    struct_in = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(
         structure_input)
-    text_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2, activation='relu')(
+    text_in = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(
+        texture_input)
+
+    struct_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+    struct_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+
+    text_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+    text_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')
+
+    one_by_conv = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=1, padding='same')
+
+    layers = []
+    for i in range(3):
+        if i == 0:
+            layers.append(DualChannelLayer(struct_in, text_in, struct_conv_1, struct_conv_2, text_conv_1, text_conv_2,
+                                           one_by_conv))
+        else:
+            layers.append(
+                DualChannelLayer(layers[i - 1][0], layers[i - 1][1], struct_conv_1, struct_conv_2, text_conv_1,
+                                 text_conv_2,
+                                 one_by_conv))
+
+    cat = Concatenate(axis=-1)(layers[-1])
+
+    aggr = MPRRN(inputs=cat, rrusPerIrb=1, irbCount=1)
+
+    out = Conv2D(filters=1, kernel_size=3, padding='same')(aggr)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
+def DC_Hourglass_Interconnect_2():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                           activation='relu')(
+        structure_input)
+    text_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                         activation='relu')(
         texture_input)
 
     struct_sum_1 = Add()([struct_conv_1, text_conv_1])
     text_sum_1 = Add()([struct_conv_1, text_conv_1])
 
-    struct_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2, activation='relu')(
+    struct_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                           activation='relu')(
         struct_sum_1)
-    text_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2, activation='relu')(
+    text_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                         activation='relu')(
         text_sum_1)
 
     struct_sum_2 = Add()([struct_conv_2, text_conv_2])
     text_sum_2 = Add()([struct_conv_2, text_conv_2])
 
-    struct_conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2, activation='relu')(
+    struct_conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                           activation='relu')(
         struct_sum_2)
-    text_conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2, activation='relu')(
+    text_conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                         activation='relu')(
         text_sum_2)
 
     struct_sum_3 = Add()([struct_conv_3, text_conv_3])
     text_sum_3 = Add()([struct_conv_3, text_conv_3])
 
-    struct_conv_4 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', activation='relu')(
+    struct_conv_4 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                           activation='relu')(
         struct_sum_3)
-    text_conv_4 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', activation='relu')(
+    text_conv_4 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                         activation='relu')(
+        text_sum_3)
+
+    struct_sum_4 = Add()([struct_conv_4, text_conv_4])
+    text_sum_4 = Add()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                      strides=2, activation='relu')(struct_sum_4)
+    text_deconv_1 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                    strides=2, activation='relu')(text_sum_4)
+
+    struct_sum_5 = Add()([struct_deconv_1, text_deconv_1])
+    text_sum_5 = Add()([struct_deconv_1, text_deconv_1])
+
+    struct_deconv_2 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                      strides=2, activation='relu')(struct_sum_5)
+    text_deconv_2 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                    strides=2, activation='relu')(text_sum_5)
+
+    struct_sum_6 = Add()([struct_deconv_2, text_deconv_2])
+    text_sum_6 = Add()([struct_deconv_2, text_deconv_2])
+
+    struct_deconv_3 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                      strides=2, activation='relu')(struct_sum_6)
+    text_deconv_3 = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                    strides=2, activation='relu')(text_sum_6)
+
+    struct_sum_7 = Add()([struct_deconv_3, text_deconv_3])
+    text_sum_7 = Add()([struct_deconv_3, text_deconv_3])
+
+    # Aggregate
+
+    agg_sum = Add()([struct_sum_7, text_sum_7])
+
+    aggr = MPRRN(inputs=agg_sum, rrusPerIrb=1, irbCount=1)
+
+    out = Conv2D(filters=1, kernel_size=1, padding='same')(aggr)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
+def DC_Hourglass_Interconnect_3():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                           activation='relu')(
+        structure_input)
+    text_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                         activation='relu')(
+        texture_input)
+
+    struct_sum_1 = Add()([struct_conv_1, text_conv_1])
+    text_sum_1 = Add()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                           activation='relu')(
+        struct_sum_1)
+    text_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                         activation='relu')(
+        text_sum_1)
+
+    struct_sum_2 = Add()([struct_conv_2, text_conv_2])
+    text_sum_2 = Add()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                           activation='relu')(
+        struct_sum_2)
+    text_conv_3 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2,
+                         activation='relu')(
+        text_sum_2)
+
+    struct_sum_3 = Add()([struct_conv_3, text_conv_3])
+    text_sum_3 = Add()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                           activation='relu')(
+        struct_sum_3)
+    text_conv_4 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                         activation='relu')(
         text_sum_3)
 
     struct_sum_4 = Add()([struct_conv_4, text_conv_4])
