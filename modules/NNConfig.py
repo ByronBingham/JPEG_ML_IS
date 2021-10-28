@@ -2,9 +2,9 @@
 # NN config
 #######################################
 INPUT_SHAPE = (None, None, 1)
-NN_MODEL = 'dc_hourglass_interconnect_3'
+NN_MODEL = 'dc_hourglass_interconnect_5'
 DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode strrn_no_irb_residual strrn_no_irb_residual_encodedecode \
-                dualchannelinterconnect_4 dualchannelinterconnect_struct_encodedecode dc_hourglass_interconnect_3'
+                dualchannelinterconnect_4 dualchannelinterconnect_struct_encodedecode dc_hourglass_interconnect_5'
 JPEG_QUALITY = 10
 
 # STRRN config
@@ -62,9 +62,9 @@ TEST_BATCH_SIZE = 1  # testing uses full images which takes a lot more memory
 DROPOUT_RATE = 0.2
 
 DATASET_EARLY_STOP = False
-TRAIN_EARLY_STOP = 1000  # number of batches
+TRAIN_EARLY_STOP = 1#1000  # number of batches
 VALIDATION_EARLY_STOP = 1
-TEST_EARLY_STOP = 100
+TEST_EARLY_STOP = 1#100
 
 EVEN_PAD_DATA = 8  # should be powers of 2
 
