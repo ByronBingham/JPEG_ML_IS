@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from tensorflow.keras.layers import Input, Conv2D, BatchNormalization, ReLU, Add, Activation, Conv2DTranspose, Layer, \
-    Dropout, Concatenate
+    Dropout, Concatenate, MaxPooling2D
 from modules.NNConfig import INPUT_SHAPE, MPRRN_FILTERS_PER_LAYER, MPRRN_FILTER_SHAPE, MPRRN_RRU_PER_IRB, MPRRN_IRBS, \
     DROPOUT_RATE, STRUCTURE_FILTERS_PER_LAYER, TEXTURE_FILTERS_PER_LAYER
 
@@ -33,7 +33,7 @@ def kerasExample_model():
         "padding": "same"
     }
 
-    inputs = Input(shape=(None, None, 3), dtype=tf.dtypes.float32)
+    inputs = Input(shape=(None, None, 1), dtype=tf.dtypes.float32)
 
     layer1 = Conv2D(filters=64, kernel_size=5, **conv_args)(inputs)
 
@@ -41,7 +41,7 @@ def kerasExample_model():
 
     layer3 = Conv2D(filters=32, kernel_size=3, **conv_args)(layer2)
 
-    output = Conv2D(filters=3, kernel_size=3, **conv_args)(layer3)
+    output = Conv2D(filters=1, kernel_size=3, **conv_args)(layer3)
 
     return tf.keras.Model(inputs, output)
 
@@ -839,7 +839,7 @@ def DC_Hourglass_Interconnect_4():
     return model
 
 
-def HourglassLayer(type, inputLayer):
+def HourglassLayer_1(type, inputLayer):
     if type == 'conv':
         bn = BatchNormalization()(inputLayer)
         relu = ReLU()(bn)
@@ -865,44 +865,44 @@ def DC_Hourglass_Interconnect_5():
     structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
     texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
 
-    struct_conv_1 = HourglassLayer('conv', structure_input)
-    text_conv_1 = HourglassLayer('conv', texture_input)
+    struct_conv_1 = HourglassLayer_1('conv', structure_input)
+    text_conv_1 = HourglassLayer_1('conv', texture_input)
 
     struct_sum_1 = Add()([struct_conv_1, text_conv_1])
     text_sum_1 = Add()([struct_conv_1, text_conv_1])
 
-    struct_conv_2 = HourglassLayer('conv', struct_sum_1)
-    text_conv_2 = HourglassLayer('conv', text_sum_1)
+    struct_conv_2 = HourglassLayer_1('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_1('conv', text_sum_1)
 
     struct_sum_2 = Add()([struct_conv_2, text_conv_2])
     text_sum_2 = Add()([struct_conv_2, text_conv_2])
 
-    struct_conv_3 = HourglassLayer('conv', struct_sum_2)
-    text_conv_3 = HourglassLayer('conv', text_sum_2)
+    struct_conv_3 = HourglassLayer_1('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_1('conv', text_sum_2)
 
     struct_sum_3 = Add()([struct_conv_3, text_conv_3])
     text_sum_3 = Add()([struct_conv_3, text_conv_3])
 
-    struct_conv_4 = HourglassLayer('conv1to1', struct_sum_3)
-    text_conv_4 = HourglassLayer('conv1to1', text_sum_3)
+    struct_conv_4 = HourglassLayer_1('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_1('conv1to1', text_sum_3)
 
     struct_sum_4 = Add()([struct_conv_4, text_conv_4])
     text_sum_4 = Add()([struct_conv_4, text_conv_4])
 
-    struct_deconv_1 = HourglassLayer('deconv', struct_sum_4)
-    text_deconv_1 = HourglassLayer('deconv', text_sum_4)
+    struct_deconv_1 = HourglassLayer_1('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_1('deconv', text_sum_4)
 
     struct_sum_5 = Add()([struct_deconv_1, text_deconv_1, struct_conv_2])
     text_sum_5 = Add()([struct_deconv_1, text_deconv_1, text_conv_2])
 
-    struct_deconv_2 = HourglassLayer('deconv', struct_sum_5)
-    text_deconv_2 = HourglassLayer('deconv', text_sum_5)
+    struct_deconv_2 = HourglassLayer_1('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_1('deconv', text_sum_5)
 
     struct_sum_6 = Add()([struct_deconv_2, text_deconv_2, struct_conv_1])
     text_sum_6 = Add()([struct_deconv_2, text_deconv_2, text_conv_1])
 
-    struct_deconv_3 = HourglassLayer('deconv', struct_sum_6)
-    text_deconv_3 = HourglassLayer('deconv', text_sum_6)
+    struct_deconv_3 = HourglassLayer_1('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_1('deconv', text_sum_6)
 
     # Aggregate
 
@@ -916,6 +916,452 @@ def DC_Hourglass_Interconnect_5():
 
     return model
 
+
+def HourglassLayer_2(type, inputLayer):
+    if type == 'conv':
+        bn = BatchNormalization()(inputLayer)
+        conv = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same', strides=2)(bn)
+        relu = ReLU()(conv)
+        return relu
+    elif type == 'conv1to1':
+        bn = BatchNormalization()(inputLayer)
+        conv = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(bn)
+        relu = ReLU()(conv)
+
+        return relu
+    elif type == 'deconv':
+        bn = BatchNormalization()(inputLayer)
+        deconv = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                 strides=2)(bn)
+        relu = ReLU()(deconv)
+
+        return relu
+    else:
+        print("Invalid layer type")
+        return None
+
+
+def DC_Hourglass_Interconnect_6():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_2('conv', structure_input)
+    text_conv_1 = HourglassLayer_2('conv', texture_input)
+
+    struct_sum_1 = Add()([struct_conv_1, text_conv_1])
+    text_sum_1 = Add()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = HourglassLayer_2('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_2('conv', text_sum_1)
+
+    struct_sum_2 = Add()([struct_conv_2, text_conv_2])
+    text_sum_2 = Add()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = HourglassLayer_2('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_2('conv', text_sum_2)
+
+    struct_sum_3 = Add()([struct_conv_3, text_conv_3])
+    text_sum_3 = Add()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = HourglassLayer_2('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_2('conv1to1', text_sum_3)
+
+    struct_sum_4 = Add()([struct_conv_4, text_conv_4])
+    text_sum_4 = Add()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = HourglassLayer_2('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_2('deconv', text_sum_4)
+
+    struct_sum_5 = Add()([struct_deconv_1, text_deconv_1, struct_conv_2])
+    text_sum_5 = Add()([struct_deconv_1, text_deconv_1, text_conv_2])
+
+    struct_deconv_2 = HourglassLayer_2('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_2('deconv', text_sum_5)
+
+    struct_sum_6 = Add()([struct_deconv_2, text_deconv_2, struct_conv_1])
+    text_sum_6 = Add()([struct_deconv_2, text_deconv_2, text_conv_1])
+
+    struct_deconv_3 = HourglassLayer_2('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_2('deconv', text_sum_6)
+
+    # Aggregate
+
+    agg_sum = Add()([struct_deconv_3, text_deconv_3, structure_input, texture_input])
+
+    aggr = MPRRN(inputs=agg_sum, rrusPerIrb=1, irbCount=1)
+
+    out = Conv2D(filters=1, kernel_size=1, padding='same')(aggr)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
+def DC_Hourglass_Interconnect_7():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_1('conv', structure_input)
+    text_conv_1 = HourglassLayer_1('conv', texture_input)
+
+    struct_sum_1 = Add()([struct_conv_1, text_conv_1])
+    text_sum_1 = Add()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = HourglassLayer_1('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_1('conv', text_sum_1)
+
+    struct_sum_2 = Add()([struct_conv_2, text_conv_2])
+    text_sum_2 = Add()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = HourglassLayer_1('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_1('conv', text_sum_2)
+
+    struct_sum_3 = Add()([struct_conv_3, text_conv_3])
+    text_sum_3 = Add()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = HourglassLayer_1('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_1('conv1to1', text_sum_3)
+
+    struct_sum_4 = Add()([struct_conv_4, text_conv_4])
+    text_sum_4 = Add()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = HourglassLayer_1('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_1('deconv', text_sum_4)
+
+    struct_sum_5 = Add()([struct_deconv_1, text_deconv_1, struct_conv_2])
+    text_sum_5 = Add()([struct_deconv_1, text_deconv_1, text_conv_2])
+
+    struct_deconv_2 = HourglassLayer_1('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_1('deconv', text_sum_5)
+
+    struct_sum_6 = Add()([struct_deconv_2, text_deconv_2, struct_conv_1])
+    text_sum_6 = Add()([struct_deconv_2, text_deconv_2, text_conv_1])
+
+    struct_deconv_3 = HourglassLayer_1('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_1('deconv', text_sum_6)
+
+    # Aggregate
+
+    agg_cat = Concatenate()([struct_deconv_3, text_deconv_3, structure_input, texture_input])
+
+    aggr = MPRRN(inputs=agg_cat, rrusPerIrb=1, irbCount=1)
+
+    out = Conv2D(filters=1, kernel_size=1, padding='same')(aggr)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
+def DC_Hourglass_Interconnect_8():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_1('conv', structure_input)
+    text_conv_1 = HourglassLayer_1('conv', texture_input)
+
+    struct_sum_1 = Add()([struct_conv_1, text_conv_1])
+    text_sum_1 = Add()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = HourglassLayer_1('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_1('conv', text_sum_1)
+
+    struct_sum_2 = Add()([struct_conv_2, text_conv_2])
+    text_sum_2 = Add()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = HourglassLayer_1('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_1('conv', text_sum_2)
+
+    struct_sum_3 = Add()([struct_conv_3, text_conv_3])
+    text_sum_3 = Add()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = HourglassLayer_1('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_1('conv1to1', text_sum_3)
+
+    struct_conv_4b = HourglassLayer_1('conv1to1', struct_conv_4)
+    text_conv_4b = HourglassLayer_1('conv1to1', text_conv_4)
+
+    struct_sum_4 = Add()([struct_conv_4b, text_conv_4b])
+    text_sum_4 = Add()([struct_conv_4b, text_conv_4b])
+
+    struct_deconv_1 = HourglassLayer_1('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_1('deconv', text_sum_4)
+
+    struct_sum_5 = Add()([struct_deconv_1, text_deconv_1, struct_conv_2])
+    text_sum_5 = Add()([struct_deconv_1, text_deconv_1, text_conv_2])
+
+    struct_deconv_2 = HourglassLayer_1('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_1('deconv', text_sum_5)
+
+    struct_sum_6 = Add()([struct_deconv_2, text_deconv_2, struct_conv_1])
+    text_sum_6 = Add()([struct_deconv_2, text_deconv_2, text_conv_1])
+
+    struct_deconv_3 = HourglassLayer_1('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_1('deconv', text_sum_6)
+
+    # Aggregate
+
+    agg_cat = Concatenate()([struct_deconv_3, text_deconv_3, structure_input, texture_input])
+
+    aggr = MPRRN(inputs=agg_cat, rrusPerIrb=1, irbCount=1)
+
+    out = Conv2D(filters=1, kernel_size=1, padding='same')(aggr)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
+def DC_Hourglass_Interconnect_9():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_1('conv', structure_input)
+    text_conv_1 = HourglassLayer_1('conv', texture_input)
+
+    struct_sum_1 = Add()([struct_conv_1, text_conv_1])
+    text_sum_1 = Add()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = HourglassLayer_1('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_1('conv', text_sum_1)
+
+    struct_sum_2 = Add()([struct_conv_2, text_conv_2])
+    text_sum_2 = Add()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = HourglassLayer_1('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_1('conv', text_sum_2)
+
+    struct_sum_3 = Add()([struct_conv_3, text_conv_3])
+    text_sum_3 = Add()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = HourglassLayer_1('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_1('conv1to1', text_sum_3)
+
+    struct_sum_4 = Add()([struct_conv_4, text_conv_4])
+    text_sum_4 = Add()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = HourglassLayer_1('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_1('deconv', text_sum_4)
+
+    struct_sum_5 = Add()([struct_deconv_1, text_deconv_1, struct_conv_2])
+    text_sum_5 = Add()([struct_deconv_1, text_deconv_1, text_conv_2])
+
+    struct_deconv_2 = HourglassLayer_1('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_1('deconv', text_sum_5)
+
+    struct_sum_6 = Add()([struct_deconv_2, text_deconv_2, struct_conv_1])
+    text_sum_6 = Add()([struct_deconv_2, text_deconv_2, text_conv_1])
+
+    struct_deconv_3 = HourglassLayer_1('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_1('deconv', text_sum_6)
+
+    # Aggregate
+
+    agg_cat = Concatenate()([struct_deconv_3, text_deconv_3, structure_input, texture_input])
+
+    pre_agg_1 = HourglassLayer_1('conv1to1', agg_cat)
+
+    pre_agg_2 = HourglassLayer_1('conv1to1', pre_agg_1)
+
+    agg_conv_1 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(pre_agg_2)
+    agg_conv_2 = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(agg_conv_1)
+
+    out = Conv2D(filters=1, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(agg_conv_2)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
+def HourglassLayer_3(type, inputLayer):
+    if type == 'conv':
+        bn = BatchNormalization()(inputLayer)
+        relu = ReLU()(bn)
+        conv = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(relu)
+        pool = MaxPooling2D(pool_size=2, padding='same')(conv)
+        return pool
+    elif type == 'conv1to1':
+        bn = BatchNormalization()(inputLayer)
+        relu = ReLU()(bn)
+        conv = Conv2D(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same')(relu)
+        return conv
+    elif type == 'deconv':
+        bn = BatchNormalization()(inputLayer)
+        relu = ReLU()(bn)
+        deconv = Conv2DTranspose(filters=MPRRN_FILTERS_PER_LAYER, kernel_size=MPRRN_FILTER_SHAPE, padding='same',
+                                 strides=2)(relu)
+        return deconv
+    else:
+        print("Invalid layer type")
+        return None
+
+
+def DC_Hourglass_Interconnect_10():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_3('conv', structure_input)
+    text_conv_1 = HourglassLayer_3('conv', texture_input)
+
+    struct_sum_1 = Add()([struct_conv_1, text_conv_1])
+    text_sum_1 = Add()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = HourglassLayer_3('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_3('conv', text_sum_1)
+
+    struct_sum_2 = Add()([struct_conv_2, text_conv_2])
+    text_sum_2 = Add()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = HourglassLayer_3('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_3('conv', text_sum_2)
+
+    struct_sum_3 = Add()([struct_conv_3, text_conv_3])
+    text_sum_3 = Add()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = HourglassLayer_3('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_3('conv1to1', text_sum_3)
+
+    struct_sum_4 = Add()([struct_conv_4, text_conv_4])
+    text_sum_4 = Add()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = HourglassLayer_3('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_3('deconv', text_sum_4)
+
+    struct_sum_5 = Add()([struct_deconv_1, text_deconv_1, struct_conv_2])
+    text_sum_5 = Add()([struct_deconv_1, text_deconv_1, text_conv_2])
+
+    struct_deconv_2 = HourglassLayer_3('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_3('deconv', text_sum_5)
+
+    struct_sum_6 = Add()([struct_deconv_2, text_deconv_2, struct_conv_1])
+    text_sum_6 = Add()([struct_deconv_2, text_deconv_2, text_conv_1])
+
+    struct_deconv_3 = HourglassLayer_3('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_3('deconv', text_sum_6)
+
+    # Aggregate
+
+    agg_sum = Add()([struct_deconv_3, text_deconv_3, structure_input, texture_input])
+
+    aggr = MPRRN(inputs=agg_sum, rrusPerIrb=1, irbCount=1)
+
+    out = Conv2D(filters=1, kernel_size=1, padding='same')(aggr)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
+def DC_Hourglass_Interconnect_11():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_3('conv', structure_input)
+    text_conv_1 = HourglassLayer_3('conv', texture_input)
+
+    struct_sum_1 = Concatenate()([struct_conv_1, text_conv_1])
+    text_sum_1 = Concatenate()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = HourglassLayer_3('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_3('conv', text_sum_1)
+
+    struct_sum_2 = Concatenate()([struct_conv_2, text_conv_2])
+    text_sum_2 = Concatenate()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = HourglassLayer_3('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_3('conv', text_sum_2)
+
+    struct_sum_3 = Concatenate()([struct_conv_3, text_conv_3])
+    text_sum_3 = Concatenate()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = HourglassLayer_3('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_3('conv1to1', text_sum_3)
+
+    struct_sum_4 = Concatenate()([struct_conv_4, text_conv_4])
+    text_sum_4 = Concatenate()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = HourglassLayer_3('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_3('deconv', text_sum_4)
+
+    struct_sum_5 = Concatenate()([struct_deconv_1, text_deconv_1, struct_conv_2])
+    text_sum_5 = Concatenate()([struct_deconv_1, text_deconv_1, text_conv_2])
+
+    struct_deconv_2 = HourglassLayer_3('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_3('deconv', text_sum_5)
+
+    struct_sum_6 = Concatenate()([struct_deconv_2, text_deconv_2, struct_conv_1])
+    text_sum_6 = Concatenate()([struct_deconv_2, text_deconv_2, text_conv_1])
+
+    struct_deconv_3 = HourglassLayer_3('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_3('deconv', text_sum_6)
+
+    # Aggregate
+
+    agg_sum = Concatenate()([struct_deconv_3, text_deconv_3, structure_input, texture_input])
+
+    aggr = MPRRN(inputs=agg_sum, rrusPerIrb=1, irbCount=1)
+
+    out = Conv2D(filters=1, kernel_size=1, padding='same')(aggr)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=out)
+
+    return model
+
+
+def DC_Hourglass_Interconnect_Top_Half_1():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_1('conv', structure_input)
+    text_conv_1 = HourglassLayer_1('conv', texture_input)
+
+    struct_sum_1 = Add()([struct_conv_1, text_conv_1])
+    text_sum_1 = Add()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = HourglassLayer_1('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_1('conv', text_sum_1)
+
+    struct_sum_2 = Add()([struct_conv_2, text_conv_2])
+    text_sum_2 = Add()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = HourglassLayer_1('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_1('conv', text_sum_2)
+
+    struct_sum_3 = Add()([struct_conv_3, text_conv_3])
+    text_sum_3 = Add()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = HourglassLayer_1('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_1('conv1to1', text_sum_3)
+
+    struct_sum_4 = Add()([struct_conv_4, text_conv_4])
+    text_sum_4 = Add()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = HourglassLayer_1('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_1('deconv', text_sum_4)
+
+    struct_sum_5 = Add()([struct_deconv_1, text_deconv_1, struct_conv_2])
+    text_sum_5 = Add()([struct_deconv_1, text_deconv_1, text_conv_2])
+
+    struct_deconv_2 = HourglassLayer_1('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_1('deconv', text_sum_5)
+
+    struct_sum_6 = Add()([struct_deconv_2, text_deconv_2, struct_conv_1])
+    text_sum_6 = Add()([struct_deconv_2, text_deconv_2, text_conv_1])
+
+    struct_deconv_3 = HourglassLayer_1('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_1('deconv', text_sum_6)
+
+    struct_out = Conv2D(filters=1, kernel_size=1, padding='same')(struct_deconv_3)
+    text_out = Conv2D(filters=1, kernel_size=1, padding='same')(text_deconv_3)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=[struct_out, text_out])
+
+    return model
+
+
+# TODO: try pooling. Maybe get rid of noise?
+# TODO: pre-train hourglass dual channels like with STRRN
+# TODO: try concatenating instead of adding in various places
 
 modelSwitch = {
     'eqlri': EQLRI_model,
@@ -933,5 +1379,14 @@ modelSwitch = {
     'mprrn_only_w1x1': MPRRN_only_w1x1,
     'dualchannelinterconnect_4': DualChannelInterconnect,
     'dualchannelinterconnect_struct_encodedecode': DualChannelInterconnect_struct_encodedecode,
-    'dc_hourglass_interconnect_5': DC_Hourglass_Interconnect_5
+    'dc_hourglass_interconnect_2': DC_Hourglass_Interconnect_2,
+    'dc_hourglass_interconnect_5': DC_Hourglass_Interconnect_5,
+    'dc_hourglass_interconnect_6': DC_Hourglass_Interconnect_6,
+    'dc_hourglass_interconnect_7': DC_Hourglass_Interconnect_7,
+    'dc_hourglass_interconnect_8': DC_Hourglass_Interconnect_8,
+    'dc_hourglass_interconnect_9': DC_Hourglass_Interconnect_9,
+    'dc_hourglass_interconnect_10': DC_Hourglass_Interconnect_10,
+    'dc_hourglass_interconnect_11': DC_Hourglass_Interconnect_11,
+    'dc_hourglass_interconnect_top_half_1': DC_Hourglass_Interconnect_Top_Half_1
+
 }

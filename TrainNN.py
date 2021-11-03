@@ -10,7 +10,7 @@ from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_S
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
     DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING, PRETRAINED_MPRRN_PATH, \
     PRETRAINED_STRUCTURE, PRETRAINED_TEXTURE, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF, L0_GRADIENT_MIN_BETA_MAX, \
-    USE_CPU_FOR_HIGH_MEMORY
+    SAVE_TEST_OUT, USE_CPU_FOR_HIGH_MEMORY, TRAINING_DATASET
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessDataForSTRRN, \
     preprocessInputsForSTRRN
 from modules.Losses import JPEGLoss
@@ -61,7 +61,7 @@ class TrainNN:
 
         self.info = self.info + "_QL" + str(JPEG_QUALITY) + "filterShape" + "_batchSize" + str(
             BATCH_SIZE) + "_learningRate" + str(
-            LEARNING_RATE) + "_filterShape" + str(MPRRN_FILTER_SHAPE)
+            LEARNING_RATE) + "_filterShape" + str(MPRRN_FILTER_SHAPE) + "_" + TRAINING_DATASET
 
         self.saveFile = self.info + ".save"
         self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
@@ -157,6 +157,11 @@ class TrainNN:
             agg_in = np.add(structure_out, texture_out)
             return self.models[c](agg_in)
 
+        elif 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+            structure_out, texture_out = self.models[c](
+                [compressed_structure[..., c:c + 1], compressed_texture[..., c:c + 1]])
+            return structure_out, texture_out
+
         else:
             return self.models[c](compressed[..., c:c + 1], training=True)
 
@@ -168,10 +173,6 @@ class TrainNN:
         compressed_texture = batch['compressed_texture']
         compressed = batch['compressed']
         diff = batch['diff']
-
-        psnr = None
-        ssim = None
-        loss = None
 
         model_out = self.get_model_out(c, batch)
 
@@ -192,6 +193,14 @@ class TrainNN:
             loss = JPEGLoss(model_out, diff[..., c:c + 1], compressed[..., c:c + 1])
             psnr = tf.image.psnr(diff[..., c:c + 1], model_out, max_val=1.0)
             ssim = tf.image.ssim(diff[..., c:c + 1], model_out, max_val=1.0)
+
+        elif 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+            loss = [JPEGLoss(model_out[0], target_structure[..., c:c + 1], compressed_structure[..., c:c + 1]),
+                    JPEGLoss(model_out[1], target_texture[..., c:c + 1], compressed_texture[..., c:c + 1])]
+            psnr = [tf.image.psnr(target_structure[..., c:c + 1], model_out[0], max_val=1.0),
+                    tf.image.psnr(target_texture[..., c:c + 1], model_out[1], max_val=1.0)]
+            ssim = [tf.image.ssim(target_structure[..., c:c + 1], model_out[0], max_val=1.0),
+                    tf.image.ssim(target_texture[..., c:c + 1], model_out[1], max_val=1.0)]
         else:
             loss = JPEGLoss(model_out, original[..., c:c + 1], compressed[..., c:c + 1])
             psnr = tf.image.psnr(original[..., c:c + 1], model_out, max_val=1.0)
@@ -309,6 +318,9 @@ class TrainNN:
 
                 model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch)
 
+                if SAVE_TEST_OUT:
+                    self.savePrediction(model_out, batch['original'], batches)
+
                 total_loss += np.average(loss)
                 total_psnr += np.average(psnr)
                 total_ssim += np.average(ssim)
@@ -341,6 +353,24 @@ class TrainNN:
                 shutil.rmtree(CHECKPOINTS_PATH + "best/")
             shutil.copytree(src=CHECKPOINTS_PATH, dst=CHECKPOINTS_PATH + "best/")
             self.best_psnr = avg_psnr
+
+            if SAVE_TEST_OUT:
+                if os.path.exists("predictions_best"):
+                    shutil.rmtree("predictions_best")
+                shutil.copytree(src="predictions", dst="predictions_best")
+
+        if SAVE_TEST_OUT:
+            if os.path.exists("predictions"):
+                shutil.rmtree("predictions")
+            os.mkdir("predictions")
+
+    @staticmethod
+    def savePrediction(model_out, original, number):
+        model_out = np.asarray(model_out[0])
+        original = np.asarray(original)
+
+        np.save(file="predictions/" + str(number) + "_prediction", arr=model_out)
+        np.save(file="predictions/" + str(number) + "_original", arr=original)
 
     @staticmethod
     def sample_preprocess():
@@ -417,6 +447,9 @@ class TrainNN:
                 }
                 model_out = self.get_model_out(c, batch)
 
+                if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+                    model_out = np.append(model_out[0], model_out[1], axis=1)
+
                 channels_out.append(np.asarray(model_out))
 
             arr = np.array(channels_out)
@@ -456,6 +489,10 @@ class TrainNN:
             os.mkdir("../savedResults/")
         if not os.path.exists("../savedResults/" + self.info):
             os.mkdir("../savedResults/" + self.info)
+        else:
+            shutil.rmtree("../savedResults/" + self.info)
+            os.mkdir("../savedResults/" + self.info)
+            shutil.copy(src="modules/NNConfig.py", dst="../savedResults/" + self.info + "/" + self.info + ".config")
         if os.path.exists("../savedResults/" + self.info + "./checkpoints"):
             shutil.rmtree("../savedResults/" + self.info + "./checkpoints")
         shutil.copytree(src="./checkpoints", dst="../savedResults/" + self.info + "./checkpoints")
@@ -465,15 +502,22 @@ class TrainNN:
         if os.path.exists("../savedResults/" + self.info + "./stats"):
             shutil.rmtree("../savedResults/" + self.info + "./stats")
         shutil.copytree(src="./stats", dst="../savedResults/" + self.info + "./stats")
+        if os.path.exists("../savedResults/" + self.info + "./predictions_best"):
+            shutil.rmtree("../savedResults/" + self.info + "./predictions_best")
+        shutil.copytree(src="./predictions_best", dst="../savedResults/" + self.info + "./predictions_best")
 
     @staticmethod
     def create_dirs():
         os.mkdir("stats")
         os.mkdir("checkpoints")
         os.mkdir("sampleImageOutputs")
+        os.mkdir("predictions")
+        os.mkdir("predictions_best")
         Path("stats/.gitkeep").touch()
         Path("checkpoints/.gitkeep").touch()
         Path("sampleImageOutputs/.gitkeep").touch()
+        Path("predictions/.gitkeep").touch()
+        Path("predictions_best/.gitkeep").touch()
 
     @staticmethod
     def clean_dirs():
@@ -484,6 +528,10 @@ class TrainNN:
             os.mkdir("checkpoints")
             shutil.rmtree("sampleImageOutputs")
             os.mkdir("sampleImageOutputs")
+            shutil.rmtree("predictions")
+            os.mkdir("predictions")
+            shutil.rmtree("predictions_best")
+            os.mkdir("predictions_best")
         except FileNotFoundError:
             print("Nothing to delete here")
 

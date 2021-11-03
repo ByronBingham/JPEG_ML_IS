@@ -28,10 +28,10 @@ class JPEGDataset(object):
         self.batch_size = batch_size
 
         if dataset_type == 'train':
-            self.ds = self.ds = tfds.load('div2k_tile128', data_dir=DATASETS_DIR, shuffle_files=True,
+            self.ds = self.ds = tfds.load(TRAINING_DATASET, data_dir=DATASETS_DIR, shuffle_files=True,
                                           split='train', batch_size=batch_size)
         elif dataset_type == 'validation':
-            self.ds = self.ds = tfds.load('div2k_tile128', data_dir=DATASETS_DIR, shuffle_files=True,
+            self.ds = self.ds = tfds.load(TRAINING_DATASET, data_dir=DATASETS_DIR, shuffle_files=True,
                                           split='validation', batch_size=batch_size)
         elif dataset_type == 'test':
             self.ds = tfds.load('urban100_dataset4x', data_dir=DATASETS_DIR, batch_size=TEST_BATCH_SIZE)['test']

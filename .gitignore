@@ -7,6 +7,7 @@ modules/__pycache__
 L0GradientMin/__pycache__
 pretrainedModels/**
 *.save
+predictions_best/**
 
 !stats/.gitkeep
 !checkpoints/.gitkeep
