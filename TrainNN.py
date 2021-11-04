@@ -10,7 +10,7 @@ from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_S
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
     DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING, PRETRAINED_MPRRN_PATH, \
     PRETRAINED_STRUCTURE, PRETRAINED_TEXTURE, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF, L0_GRADIENT_MIN_BETA_MAX, \
-    SAVE_TEST_OUT, USE_CPU_FOR_HIGH_MEMORY, TRAINING_DATASET
+    SAVE_TEST_OUT, USE_CPU_FOR_HIGH_MEMORY, TRAINING_DATASET, TOP_HALF_MODEL
 from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessDataForSTRRN, \
     preprocessInputsForSTRRN
 from modules.Losses import JPEGLoss
@@ -102,6 +102,14 @@ class TrainNN:
             self.structureModels = np.asarray(self.structureModels)
             self.textureModels = np.asarray(self.textureModels)
 
+        self.dcOutModels = []
+
+        if "dc_hourglass_interconnect_bottom_half_" in NN_MODEL:
+            for c in range(3):
+                self.dcOutModels.append(Model.modelSwitch[TOP_HALF_MODEL]())
+                self.dcOutModels[c].load_weights(
+                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + TOP_HALF_MODEL)
+
         self.startingEpoch = 0
         self.best_psnr = 0.0
 
@@ -145,6 +153,9 @@ class TrainNN:
         if MPRRN_TRAINING == 'aggregator':
             structure_out = self.structureModels[c](compressed_structure[..., c:c + 1])
             texture_out = self.textureModels[c](compressed_texture[..., c:c + 1])
+        if "dc_hourglass_interconnect_bottom_half_" in NN_MODEL:
+            structure_out, texture_out = self.dcOutModels[c](
+                [compressed_structure[..., c:c + 1], compressed_texture[..., c:c + 1]])
         if NN_MODEL in DUAL_CHANNEL_MODELS:
             return self.models[c]([compressed_structure[..., c:c + 1], compressed_texture[..., c:c + 1]],
                                   training=True)
@@ -184,7 +195,7 @@ class TrainNN:
             loss = JPEGLoss(model_out, target_texture[..., c:c + 1], compressed_texture[..., c:c + 1])
             psnr = tf.image.psnr(target_texture[..., c:c + 1], model_out, max_val=1.0)
             ssim = tf.image.ssim(target_texture[..., c:c + 1], model_out, max_val=1.0)
-        elif MPRRN_TRAINING == 'aggregator':
+        elif MPRRN_TRAINING == 'aggregator' or ("dc_hourglass_interconnect_bottom_half_" in NN_MODEL):
             loss = JPEGLoss(model_out, original[..., c:c + 1], compressed[..., c:c + 1])
             psnr = tf.image.psnr(original[..., c:c + 1], model_out, max_val=1.0)
             ssim = tf.image.ssim(original[..., c:c + 1], model_out, max_val=1.0)

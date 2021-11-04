@@ -57,8 +57,8 @@ def MGE_MSE_combinedLoss(outputs, targets):
 def JPEGLoss(outputs, targets, inputs):
     if NN_MODEL == 'mprrn_only' and (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
         # out = MPRRN_Loss(outputs, targets, inputs)
-        # out = MGE_MSE_combinedLoss(outputs, targets)
-        out = tf.losses.mse(targets, outputs)
+        out = MGE_MSE_combinedLoss(outputs, targets)
+        # out = tf.losses.mse(targets, outputs)
     else:
         out = tf.losses.mse(targets, outputs)
 

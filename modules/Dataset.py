@@ -8,6 +8,7 @@ import datasets.urban100_dataset_all
 import datasets.div2k_preprocessed
 import datasets.div2k_tile128
 import datasets.div2k_tile32
+import datasets.reds_lr_dataset
 
 from PIL import Image
 from io import BytesIO
