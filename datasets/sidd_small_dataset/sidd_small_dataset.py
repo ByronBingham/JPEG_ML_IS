@@ -21,9 +21,10 @@ _CITATION = """
 class SIDD_small_dataset(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for sidd_small_dataset."""
 
-    VERSION = tfds.core.Version('1.0.0')
+    VERSION = tfds.core.Version('1.1.0')
     RELEASE_NOTES = {
         '1.0.0': 'Initial release.',
+        '1.1.0': 'Added compressed feature.'
     }
 
     def _info(self) -> tfds.core.DatasetInfo:
@@ -34,6 +35,7 @@ class SIDD_small_dataset(tfds.core.GeneratorBasedBuilder):
             features=tfds.features.FeaturesDict({
                 # These are the features of your dataset like images, labels ...
                 'original': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
+                'compressed': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
             }),
             # If there's a common (input, target) tuple from the
             # features, specify them here. They'll be used if
@@ -46,7 +48,7 @@ class SIDD_small_dataset(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Returns SplitGenerators."""
 
-        path = Path("e:/datasets/sidd_small/")
+        path = Path("e:/datasets/sidd_small_test_preprocessed_QL25/")
 
         return {
             'test': self._generate_examples(path),
@@ -54,12 +56,14 @@ class SIDD_small_dataset(tfds.core.GeneratorBasedBuilder):
 
     def _generate_examples(self, path):
         """Yields examples."""
-        for f in path.glob('*/GT_SRGB_*.png'):
-            image = Image.open(str(f))
-            original = np.asarray(image)
-            original = original / 255.0
-            original = original.astype('float32')
+        for f in path.glob('*/*original.npy'):
+            original = np.load(str(f))
+
+            baseName = str(f).replace("original.npy", "")
+
+            compressed = np.load(baseName + "compressed.npy")
 
             yield str(f), {
                 'original': original,
+                'compressed': compressed
             }

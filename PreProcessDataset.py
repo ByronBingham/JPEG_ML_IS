@@ -3,25 +3,29 @@ from io import BytesIO
 
 from PIL import Image
 from multiprocessing import Pool
+from Lib.pathlib import Path
 
 import os
 import numpy as np
 
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
-from modules.NNConfig import L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX, JPEG_QUALITY
+from modules.NNConfig import L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX
 
-DATASET_PATH = 'e:/datasets/div2k_dataset/downloads/extracted/'
-OUTPUT_PATH = 'e:/datasets/div2k_dataset/preprocessed/tile128/'
+DATASET_PATH = Path('e:/datasets/pixiv_test_dataset/')
+OUTPUT_PATH = 'e:/datasets/pixiv_test_dataset_preprocessed/'
 
-FILE_SUFFIX = '.png'
+FILE_SUFFIX = '*.png'
 DIFF_FILE_SUFFIX = '.original.npy'
 
 PATCH_SIZE = 128
 STRIDE = 87
 
-SEGMENT_IMAGES = True
-AUGMENT_IMAGES = True
-STRRN_PREPROCESSING = True
+SEGMENT_IMAGES = False
+AUGMENT_IMAGES = False
+STRRN_PREPROCESSING = False
+INCLUDE_DIFFS = False
+
+JPEG_QUALITY = 25
 
 SKIP = -1
 
@@ -55,7 +59,7 @@ def STRRN_processing_and_save(original, compressed, out_dir, count):
     np.save(out_dir + str(count) + ".target_texture", targetTexture)
 
 
-def saveImages(img, out_dir, count):
+def saveImages(img, out_dir, count, img_num):
     buffer = BytesIO()
     pil_img = Image.fromarray(img)
     pil_img.save(buffer, format="JPEG", quality=JPEG_QUALITY)
@@ -71,13 +75,13 @@ def saveImages(img, out_dir, count):
         originalTarget = originalTarget.astype('float32')
         originalCompressed = originalCompressed.astype('float32')
 
-        np.save(out_dir + str(count) + ".original", originalTarget)
-        np.save(out_dir + str(count) + ".compressed", originalCompressed)
+        np.save(out_dir + str(img_num) + "_" + str(count) + ".original", originalTarget)
+        np.save(out_dir + str(img_num) + "_" + str(count) + ".compressed", originalCompressed)
 
 
-def process(r, file, image_num):
+def process(file, image_num):
     imgs = []
-    out_dir = OUTPUT_PATH + os.path.splitext(os.path.basename(file))[0]
+    out_dir = OUTPUT_PATH + str(image_num)
 
     # open file and augment data
     if os.path.exists(out_dir):
@@ -85,8 +89,9 @@ def process(r, file, image_num):
     if os.path.exists(out_dir + "_tmp"):
         shutil.rmtree(out_dir + "_tmp")
 
-    image_file = Image.open(r + "/" + file)
-    imgs.append(np.asarray(image_file))
+    image_file = Image.open(str(file))
+    tmp = np.asarray(image_file)[..., 0:3]  # Remove alpha channel
+    imgs.append(tmp)
     if AUGMENT_IMAGES:
         imgs.append(np.asarray(image_file.rotate(90, expand=True)))
         imgs.append(np.asarray(image_file.rotate(180, expand=True)))
@@ -99,26 +104,25 @@ def process(r, file, image_num):
 
     imgs = np.asarray(imgs)
 
-    # spit images into tiles
-
     count = 0
     for image in imgs:
         x_stride = 0
         y_stride = 0
 
+        # spit images into tiles
         if SEGMENT_IMAGES:
             while x_stride < image.shape[0] - PATCH_SIZE - 1:
                 while y_stride < image.shape[1] - PATCH_SIZE - 1:
                     tmp = image[x_stride:(x_stride + PATCH_SIZE), y_stride:(y_stride + PATCH_SIZE), ...]
 
-                    saveImages(tmp, out_dir + "_tmp/", count)
+                    saveImages(tmp, out_dir + "_tmp/", count, image_num)
 
                     count += 1
 
                     y_stride += STRIDE
                 x_stride += STRIDE
         else:
-            saveImages(image, out_dir + "_tmp/", count)
+            saveImages(image, out_dir + "_tmp/", count, image_num)
             count += 1
 
     os.rename(src=out_dir + "_tmp", dst=out_dir)
@@ -139,19 +143,17 @@ def preprocess():
         os.mkdir(OUTPUT_PATH)
 
     files = []
-    for r, d, f in os.walk(DATASET_PATH):
-        image_num = 0
-        for file in f:
-            if image_num < SKIP:
-                image_num += 1
-                continue
-
-            if FILE_SUFFIX in file:
-                files.append((r, file, image_num))
-                image_num += 1
+    image_num = 0
+    for f in DATASET_PATH.glob(FILE_SUFFIX):
+        if image_num < SKIP:
+            image_num += 1
+            continue
+        else:
+            files.append((f, image_num))
+            image_num += 1
 
     with Pool(processes=15, maxtasksperchild=4) as p:
-        print(p.starmap(func=process, iterable=files))
+        p.starmap(func=process, iterable=files)
 
     p.close()
     p.join()
@@ -202,5 +204,5 @@ def preProcessDiffs():
 
 
 if __name__ == '__main__':
-    # preprocess()
-    preProcessDiffs()
+    preprocess()
+    # preProcessDiffs()
