@@ -1,8 +1,8 @@
-"""sidd_small_dataset."""
+"""div2k_preprocessed dataset."""
 
 import tensorflow_datasets as tfds
-import numpy as np
 import tensorflow as tf
+import numpy as np
 
 from PIL import Image
 from Lib.pathlib import Path
@@ -18,14 +18,12 @@ _CITATION = """
 """
 
 
-class BSDS500_test_dataset(tfds.core.GeneratorBasedBuilder):
-    """DatasetBuilder for sidd_small_dataset."""
+class Div2k_greyscale_ql10(tfds.core.GeneratorBasedBuilder):
+    """DatasetBuilder for div2k_tile128 dataset."""
 
-    VERSION = tfds.core.Version('1.2.0')
+    VERSION = tfds.core.Version('1.0.0')
     RELEASE_NOTES = {
         '1.0.0': 'Initial release.',
-        '1.1.0': 'Added compressed feature.',
-        '1.2.0': 'Added STRRN features'
     }
 
     def _info(self) -> tfds.core.DatasetInfo:
@@ -35,15 +33,15 @@ class BSDS500_test_dataset(tfds.core.GeneratorBasedBuilder):
             description=_DESCRIPTION,
             features=tfds.features.FeaturesDict({
                 # These are the features of your dataset like images, labels ...
-                'original': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
-                'target_structure': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
+                'original': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32, encoding='zlib'),
+                'target_structure': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32,
                                                          encoding='zlib'),
-                'target_texture': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
-                'compressed_structure': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
+                'target_texture': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32, encoding='zlib'),
+                'compressed_structure': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32,
                                                              encoding='zlib'),
-                'compressed_texture': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
+                'compressed_texture': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32,
                                                            encoding='zlib'),
-                'compressed': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
+                'compressed': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32, encoding='zlib')
             }),
             # If there's a common (input, target) tuple from the
             # features, specify them here. They'll be used if
@@ -56,10 +54,12 @@ class BSDS500_test_dataset(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Returns SplitGenerators."""
 
-        path = Path("e:/datasets/BSDS500/preprocessed_QL10/")
+        path_train = Path("e:/datasets/div2k_dataset/greyscale_preprocessed_QL10/train")
+        path_validation = Path("e:/datasets/div2k_dataset/greyscale_preprocessed_QL10/validation")
 
         return {
-            'test': self._generate_examples(path),
+            'train': self._generate_examples(path_train),
+            'validation': self._generate_examples(path_validation)
         }
 
     def _generate_examples(self, path):
@@ -75,11 +75,18 @@ class BSDS500_test_dataset(tfds.core.GeneratorBasedBuilder):
             compressed_texture = np.load(baseName + "compressed_texture.npy")
             compressed = np.load(baseName + "compressed.npy")
 
+            original = np.expand_dims(original, axis=-1)
+            target_structure = np.expand_dims(target_structure, axis=-1)
+            target_texture = np.expand_dims(target_texture, axis=-1)
+            compressed_structure = np.expand_dims(compressed_structure, axis=-1)
+            compressed_texture = np.expand_dims(compressed_texture, axis=-1)
+            compressed = np.expand_dims(compressed, axis=-1)
+
             yield str(f), {
                 'original': original,
                 'target_structure': target_structure,
                 'target_texture': target_texture,
                 'compressed_structure': compressed_structure,
                 'compressed_texture': compressed_texture,
-                'compressed': compressed,
+                'compressed': compressed
             }

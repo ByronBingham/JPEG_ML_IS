@@ -21,10 +21,11 @@ _CITATION = """
 class SIDD_small_dataset(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for sidd_small_dataset."""
 
-    VERSION = tfds.core.Version('1.1.0')
+    VERSION = tfds.core.Version('1.2.0')
     RELEASE_NOTES = {
         '1.0.0': 'Initial release.',
-        '1.1.0': 'Added compressed feature.'
+        '1.1.0': 'Added compressed feature.',
+        '1.2.0': 'Added STRRN features'
     }
 
     def _info(self) -> tfds.core.DatasetInfo:
@@ -35,6 +36,13 @@ class SIDD_small_dataset(tfds.core.GeneratorBasedBuilder):
             features=tfds.features.FeaturesDict({
                 # These are the features of your dataset like images, labels ...
                 'original': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
+                'target_structure': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
+                                                         encoding='zlib'),
+                'target_texture': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
+                'compressed_structure': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
+                                                             encoding='zlib'),
+                'compressed_texture': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32,
+                                                           encoding='zlib'),
                 'compressed': tfds.features.Tensor(shape=(None, None, 3), dtype=tf.dtypes.float32, encoding='zlib'),
             }),
             # If there's a common (input, target) tuple from the
@@ -61,9 +69,17 @@ class SIDD_small_dataset(tfds.core.GeneratorBasedBuilder):
 
             baseName = str(f).replace("original.npy", "")
 
+            target_structure = np.load(baseName + "target_structure.npy")
+            target_texture = np.load(baseName + "target_texture.npy")
+            compressed_structure = np.load(baseName + "compressed_structure.npy")
+            compressed_texture = np.load(baseName + "compressed_texture.npy")
             compressed = np.load(baseName + "compressed.npy")
 
             yield str(f), {
                 'original': original,
-                'compressed': compressed
+                'target_structure': target_structure,
+                'target_texture': target_texture,
+                'compressed_structure': compressed_structure,
+                'compressed_texture': compressed_texture,
+                'compressed': compressed,
             }

@@ -14,7 +14,7 @@ from PIL import Image
 from io import BytesIO
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 
-from modules.NNConfig import DATASET_PREFETCH, JPEG_QUALITY, L0_GRADIENT_MIN_LAMDA, \
+from modules.NNConfig import DATASET_PREFETCH, L0_GRADIENT_MIN_LAMDA, \
     L0_GRADIENT_MIN_BETA_MAX, TRAINING_DATASET, DATASETS_DIR, DATASET_EARLY_STOP, TRAIN_EARLY_STOP, \
     VALIDATION_EARLY_STOP, TEST_EARLY_STOP, EVEN_PAD_DATA, TEST_BATCH_SIZE
 
@@ -25,10 +25,13 @@ BATCH_PAD_MASK = 2
 
 class JPEGDataset(object):
 
-    def __init__(self, dataset_type, batch_size):
+    def __init__(self, dataset_type, batch_size, dataset_name=None):
         self.batch_size = batch_size
 
-        if dataset_type == 'train':
+        if dataset_name is not None:
+            self.ds = self.ds = tfds.load(dataset_name, data_dir=DATASETS_DIR, shuffle_files=True,
+                                          split='test', batch_size=batch_size)
+        elif dataset_type == 'train':
             self.ds = self.ds = tfds.load(TRAINING_DATASET, data_dir=DATASETS_DIR, shuffle_files=True,
                                           split='train', batch_size=batch_size)
         elif dataset_type == 'validation':

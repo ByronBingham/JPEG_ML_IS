@@ -6,13 +6,12 @@ import numpy as np
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 from modules import Model
 from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_SIZE, SAMPLE_IMAGES, JPEG_QUALITY, \
-    ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, LEARNING_RATE_DECAY_INTERVAL, LEARNING_RATE_DECAY, TEST_BATCH_SIZE, \
+    ADAM_EPSILON, LOAD_WEIGHTS, CHECKPOINTS_PATH, TEST_BATCH_SIZE, \
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
     DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING, PRETRAINED_MPRRN_PATH, \
-    PRETRAINED_STRUCTURE, PRETRAINED_TEXTURE, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF, L0_GRADIENT_MIN_BETA_MAX, \
-    SAVE_TEST_OUT, USE_CPU_FOR_HIGH_MEMORY, TRAINING_DATASET, TOP_HALF_MODEL
-from modules.Dataset import JPEGDataset, BATCH_COMPRESSED, BATCH_TARGET, preprocessDataForSTRRN, \
-    preprocessInputsForSTRRN
+    PRETRAINED_STRUCTURE_PATH, PRETRAINED_TEXTURE_PATH, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF, LOSS_FUNCTION, \
+    L0_GRADIENT_MIN_BETA_MAX, SAVE_TEST_OUT, USE_CPU_FOR_HIGH_MEMORY, TRAINING_DATASET, TOP_HALF_MODEL, IMAGE_CHANNELS
+from modules.Dataset import JPEGDataset, preprocessInputsForSTRRN
 from modules.Losses import JPEGLoss
 from PIL import Image
 from pathlib import Path
@@ -58,24 +57,28 @@ class TrainNN:
 
         if TRAIN_DIFF:
             self.info = "_diff" + self.info
+        if IMAGE_CHANNELS == 1:
+            self.info = "_greyscale" + self.info
+        elif IMAGE_CHANNELS == 3:
+            self.info = "_rgb" + self.info
 
         self.info = self.info + "_QL" + str(JPEG_QUALITY) + "filterShape" + "_batchSize" + str(
-            BATCH_SIZE) + "_learningRate" + str(
-            LEARNING_RATE) + "_filterShape" + str(MPRRN_FILTER_SHAPE) + "_" + TRAINING_DATASET
+            BATCH_SIZE) + "_learningRate" + str(LEARNING_RATE) + "_filterShape" + str(
+            MPRRN_FILTER_SHAPE) + "_" + TRAINING_DATASET + "_loss_" + LOSS_FUNCTION
 
         self.saveFile = self.info + ".save"
-        self.psnrTrainCsv = "./stats/psnr_train_" + self.info + ".csv"
-        self.ssimTrainCsv = "./stats/ssim_train_" + self.info + ".csv"
-        self.lossTrainCsv = "./stats/loss_train_" + self.info + ".csv"
-        self.accuracyTrainCsv = "./stats/accuracy_train_" + self.info + ".csv"
-        self.psnrTestCsv = "./stats/psnr_test_" + self.info + ".csv"
-        self.lossTestCsv = "./stats/loss_test_" + self.info + ".csv"
-        self.ssimTestCsv = "./stats/ssim_test_" + self.info + ".csv"
-        self.accuracyTestCsv = "./stats/accuracy_test_" + self.info + ".csv"
-        self.psnrValidationCsv = "./stats/psnr_validation_" + self.info + ".csv"
-        self.lossValidationCsv = "./stats/loss_validation_" + self.info + ".csv"
-        self.ssimValidationCsv = "./stats/ssim_validation_" + self.info + ".csv"
-        self.accuracyValidationCsv = "./stats/accuracy_Validation_" + self.info + ".csv"
+        self.psnrTrainCsv = "./stats/psnr_train.csv"
+        self.ssimTrainCsv = "./stats/ssim_train.csv"
+        self.lossTrainCsv = "./stats/loss_train.csv"
+        self.accuracyTrainCsv = "./stats/accuracy_train.csv"
+        self.psnrTestCsv = "./stats/psnr_test.csv"
+        self.lossTestCsv = "./stats/loss_test.csv"
+        self.ssimTestCsv = "./stats/ssim_test.csv"
+        self.accuracyTestCsv = "./stats/accuracy_test.csv"
+        self.psnrValidationCsv = "./stats/psnr_validation.csv"
+        self.lossValidationCsv = "./stats/loss_validation.csv"
+        self.ssimValidationCsv = "./stats/ssim_validation.csv"
+        self.accuracyValidationCsv = "./stats/accuracy_Validation.csv"
 
         if not os.path.exists("./stats"):
             os.mkdir("./stats")
@@ -84,20 +87,22 @@ class TrainNN:
         if not os.path.exists("./checkpoints"):
             os.mkdir("./checkpoints")
 
-        self.models = [Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL](), Model.modelSwitch[NN_MODEL]()]
+        self.models = []
+        for c in range(IMAGE_CHANNELS):
+            self.models.append(Model.modelSwitch[NN_MODEL]())
         self.models = np.asarray(self.models)
 
         self.structureModels = []
         self.textureModels = []
 
         if MPRRN_TRAINING == 'aggregator':
-            for c in range(3):
+            for c in range(IMAGE_CHANNELS):
                 self.structureModels.append(Model.modelSwitch[STRUCTURE_MODEL]())
                 self.textureModels.append(Model.modelSwitch[TEXTURE_MODEL]())
                 self.structureModels[c].load_weights(
-                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + PRETRAINED_STRUCTURE)
+                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + PRETRAINED_STRUCTURE_PATH)
                 self.textureModels[c].load_weights(
-                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + PRETRAINED_TEXTURE)
+                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + PRETRAINED_TEXTURE_PATH)
 
             self.structureModels = np.asarray(self.structureModels)
             self.textureModels = np.asarray(self.textureModels)
@@ -105,7 +110,7 @@ class TrainNN:
         self.dcOutModels = []
 
         if "dc_hourglass_interconnect_bottom_half_" in NN_MODEL:
-            for c in range(3):
+            for c in range(IMAGE_CHANNELS):
                 self.dcOutModels.append(Model.modelSwitch[TOP_HALF_MODEL]())
                 self.dcOutModels[c].load_weights(
                     PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + TOP_HALF_MODEL)
@@ -230,7 +235,7 @@ class TrainNN:
 
         for batch in trainData:
 
-            for c in range(3):  # do separate training pass for each RGB channel
+            for c in range(IMAGE_CHANNELS):  # do separate training pass for each RGB channel
 
                 with tf.GradientTape() as tape:
                     tape.watch(self.models[c].trainable_variables)
@@ -285,7 +290,7 @@ class TrainNN:
             compressed_texture = batch['compressed_texture']
             compressed = batch['compressed']
 
-            for c in range(3):
+            for c in range(IMAGE_CHANNELS):
 
                 model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch)
 
@@ -325,7 +330,7 @@ class TrainNN:
 
         for batch in testData:
 
-            for c in range(3):
+            for c in range(IMAGE_CHANNELS):
 
                 model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch)
 
@@ -450,7 +455,7 @@ class TrainNN:
                 structureIn, textureIn = preprocessInputsForSTRRN(np.asarray(nn_input))
 
             channels_out = []
-            for c in range(3):
+            for c in range(IMAGE_CHANNELS):
                 batch = {
                     'compressed_structure': structureIn,
                     'compressed_texture': textureIn,
@@ -484,7 +489,7 @@ class TrainNN:
     def load_weights(self):
         # load model checkpoint if exists
         try:
-            for c in range(3):
+            for c in range(IMAGE_CHANNELS):
                 self.models[c].load_weights(CHECKPOINTS_PATH + "modelCheckpoint_ch" + str(c) + "_" + self.info)
             print("Weights loaded")
         except Exception as e:
@@ -492,7 +497,7 @@ class TrainNN:
             self.clean_dirs()
 
     def save_weights(self):
-        for c in range(3):
+        for c in range(IMAGE_CHANNELS):
             self.models[c].save_weights(CHECKPOINTS_PATH + "modelCheckpoint_ch" + str(c) + "_" + self.info)
 
     def save_training_results(self):

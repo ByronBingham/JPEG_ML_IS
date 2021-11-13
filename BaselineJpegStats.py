@@ -4,7 +4,7 @@ from PIL import Image, ImageOps
 
 from modules.Dataset import JPEGDataset, preprocessDataForSTRRN
 
-ds = JPEGDataset('test', batch_size=1)
+ds = JPEGDataset('test', batch_size=1, dataset_name="bsd_s500_test_dataset")
 
 total_psnr_structure = 0.0
 total_ssim_structure = 0.0

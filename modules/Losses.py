@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from modules.NNConfig import NN_MODEL, MPRRN_TRAINING
+from modules.NNConfig import NN_MODEL, MPRRN_TRAINING, LOSS_FUNCTION
 
 
 def MeanGradientError(outputs, targets):
@@ -55,11 +55,11 @@ def MGE_MSE_combinedLoss(outputs, targets):
 
 
 def JPEGLoss(outputs, targets, inputs):
-    if NN_MODEL == 'mprrn_only' and (MPRRN_TRAINING == 'structure' or MPRRN_TRAINING == 'texture'):
-        # out = MPRRN_Loss(outputs, targets, inputs)
+    if LOSS_FUNCTION == 'mge_mse':
         out = MGE_MSE_combinedLoss(outputs, targets)
-        # out = tf.losses.mse(targets, outputs)
-    else:
+    elif LOSS_FUNCTION == 'mprrn_loss':
+        out = MPRRN_Loss(outputs, targets, inputs)
+    else:  # mse
         out = tf.losses.mse(targets, outputs)
 
     return out
