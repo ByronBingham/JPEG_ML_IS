@@ -18,13 +18,12 @@ _CITATION = """
 """
 
 
-class Urban100_greyscale_ql10(tfds.core.GeneratorBasedBuilder):
+class Div2k_grey_tile32_ql10(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for div2k_tile128 dataset."""
 
-    VERSION = tfds.core.Version('1.1.0')
+    VERSION = tfds.core.Version('1.0.0')
     RELEASE_NOTES = {
         '1.0.0': 'Initial release.',
-        '1.1.0': 'Added features for testing during training'
     }
 
     def _info(self) -> tfds.core.DatasetInfo:
@@ -42,7 +41,7 @@ class Urban100_greyscale_ql10(tfds.core.GeneratorBasedBuilder):
                                                              encoding='zlib'),
                 'compressed_texture': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32,
                                                            encoding='zlib'),
-                'compressed': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32, encoding='zlib'),
+                'compressed': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32, encoding='zlib')
             }),
             # If there's a common (input, target) tuple from the
             # features, specify them here. They'll be used if
@@ -55,10 +54,12 @@ class Urban100_greyscale_ql10(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Returns SplitGenerators."""
 
-        path_train = Path("e:/datasets/urban100_dataset/greyscale_preprocessed_QL10/")
+        path_train = Path("e:/datasets/div2k_dataset/greyscale_preprocessed_tile32_QL10/train")
+        path_validation = Path("e:/datasets/div2k_dataset/greyscale_preprocessed_tile32_QL10/validation")
 
         return {
-            'test': self._generate_examples(path_train),
+            'train': self._generate_examples(path_train),
+            'validation': self._generate_examples(path_validation)
         }
 
     def _generate_examples(self, path):
@@ -87,5 +88,5 @@ class Urban100_greyscale_ql10(tfds.core.GeneratorBasedBuilder):
                 'target_texture': target_texture,
                 'compressed_structure': compressed_structure,
                 'compressed_texture': compressed_texture,
-                'compressed': compressed,
+                'compressed': compressed
             }

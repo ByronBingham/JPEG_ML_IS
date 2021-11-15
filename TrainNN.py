@@ -58,9 +58,9 @@ class TrainNN:
         if TRAIN_DIFF:
             self.info = "_diff" + self.info
         if IMAGE_CHANNELS == 1:
-            self.info = "_greyscale" + self.info
+            self.info = "greyscale" + self.info
         elif IMAGE_CHANNELS == 3:
-            self.info = "_rgb" + self.info
+            self.info = "rgb" + self.info
 
         self.info = self.info + "_QL" + str(JPEG_QUALITY) + "filterShape" + "_batchSize" + str(
             BATCH_SIZE) + "_learningRate" + str(LEARNING_RATE) + "_filterShape" + str(
@@ -100,9 +100,9 @@ class TrainNN:
                 self.structureModels.append(Model.modelSwitch[STRUCTURE_MODEL]())
                 self.textureModels.append(Model.modelSwitch[TEXTURE_MODEL]())
                 self.structureModels[c].load_weights(
-                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + PRETRAINED_STRUCTURE_PATH)
+                    PRETRAINED_STRUCTURE_PATH + "modelCheckpoint_ch" + str(c) + "_" + STRUCTURE_MODEL)
                 self.textureModels[c].load_weights(
-                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + PRETRAINED_TEXTURE_PATH)
+                    PRETRAINED_TEXTURE_PATH + "modelCheckpoint_ch" + str(c) + "_" + TEXTURE_MODEL)
 
             self.structureModels = np.asarray(self.structureModels)
             self.textureModels = np.asarray(self.textureModels)
@@ -113,7 +113,8 @@ class TrainNN:
             for c in range(IMAGE_CHANNELS):
                 self.dcOutModels.append(Model.modelSwitch[TOP_HALF_MODEL]())
                 self.dcOutModels[c].load_weights(
-                    PRETRAINED_MPRRN_PATH + "modelCheckpoint_ch" + str(c) + "_" + TOP_HALF_MODEL)
+                    PRETRAINED_MPRRN_PATH + "dc_hourglass_grey_checkpoint/modelCheckpoint_ch" + str(
+                        c) + "_" + TOP_HALF_MODEL)
 
         self.startingEpoch = 0
         self.best_psnr = 0.0
@@ -188,7 +189,8 @@ class TrainNN:
         compressed_structure = batch['compressed_structure']
         compressed_texture = batch['compressed_texture']
         compressed = batch['compressed']
-        diff = batch['diff']
+        if TRAIN_DIFF:
+            diff = batch['diff']
 
         model_out = self.get_model_out(c, batch)
 
@@ -254,10 +256,10 @@ class TrainNN:
             print("Batch " + str(batches + 1) + " Complete", end="\r")
             batches = batches + 1
 
-        avg_loss = total_loss / batches / 3
-        avg_psnr = total_psnr / batches / 3
-        avg_ssim = total_ssim / batches / 3
-        avg_accuracy = total_accuracy / batches / 3
+        avg_loss = total_loss / batches / IMAGE_CHANNELS
+        avg_psnr = total_psnr / batches / IMAGE_CHANNELS
+        avg_ssim = total_ssim / batches / IMAGE_CHANNELS
+        avg_accuracy = total_accuracy / batches / IMAGE_CHANNELS
 
         lossFile = open(self.lossTrainCsv, "a")
         psnrFile = open(self.psnrTrainCsv, "a")
@@ -302,10 +304,10 @@ class TrainNN:
 
             batches += 1
 
-        avg_loss = total_loss / batches / 3
-        avg_psnr = total_psnr / batches / 3
-        avg_ssim = total_ssim / batches / 3
-        avg_accuracy = total_accuracy / batches / 3
+        avg_loss = total_loss / batches / IMAGE_CHANNELS
+        avg_psnr = total_psnr / batches / IMAGE_CHANNELS
+        avg_ssim = total_ssim / batches / IMAGE_CHANNELS
+        avg_accuracy = total_accuracy / batches / IMAGE_CHANNELS
 
         lossFile = open(self.lossValidationCsv, "a")
         psnrFile = open(self.psnrValidationCsv, "a")
@@ -345,10 +347,10 @@ class TrainNN:
 
             batches += 1
 
-        avg_loss = total_loss / batches / 3
-        avg_psnr = total_psnr / batches / 3
-        avg_ssim = total_ssim / batches / 3
-        avg_accuracy = total_accuracy / batches / 3
+        avg_loss = total_loss / batches / IMAGE_CHANNELS
+        avg_psnr = total_psnr / batches / IMAGE_CHANNELS
+        avg_ssim = total_ssim / batches / IMAGE_CHANNELS
+        avg_accuracy = total_accuracy / batches / IMAGE_CHANNELS
 
         lossFile = open(self.lossTestCsv, "a")
         psnrFile = open(self.psnrTestCsv, "a")
@@ -483,6 +485,8 @@ class TrainNN:
         output = np.clip(output, a_min=0.0, a_max=1.0)
         output = output * 255.0
         output = np.array(output).astype('uint8')
+        if IMAGE_CHANNELS == 1:
+            output = np.repeat(a=output, repeats=3, axis=-1)
         out_img = Image.fromarray(output[0])
         out_img.save(file, format="PNG")
 

@@ -11,21 +11,21 @@ import numpy as np
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 from modules.NNConfig import L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX
 
-DATASET_PATH = Path('e:/datasets/urban100_dataset/image_SRF_4')
-OUTPUT_PATH = 'e:/datasets/urban100_dataset/greyscale_preprocessed/'
+DATASET_PATH = Path('e:/datasets/BSDS500/custom_splits/train/')
+OUTPUT_PATH = 'e:/datasets/BSDS500/greyscale_preprocessed_tile32_QL10/train/'
 
-FILE_SUFFIX = '*HR.png'
+FILE_SUFFIX = '*.jpg'
 DIFF_FILE_SUFFIX = '.original.npy'
 
 SAVE_FORMAT = 'npy'  # 'png'
 OUTPUT_SEPARATE_DIR = False
 SUB_DIR_FOR_EACH_EXAMPLE = True
 
-PATCH_SIZE = 128
-STRIDE = 87
+PATCH_SIZE = 32
+STRIDE = 21
 
-SEGMENT_IMAGES = False
-AUGMENT_IMAGES = False
+SEGMENT_IMAGES = True
+AUGMENT_IMAGES = True
 STRRN_PREPROCESSING = True
 INCLUDE_DIFFS = False
 CONVERT_TO_GREYSCALE = True
@@ -33,7 +33,7 @@ CONVERT_TO_GREYSCALE = True
 JPEG_QUALITY = 10
 
 SKIP = -1
-PROCESSES = 15
+PROCESSES = 1#5
 MAX_TASKS_PER_CHILD = 1
 
 
@@ -58,12 +58,12 @@ def STRRN_processing_and_save(original, compressed, out_dir, count):
     targetStructure = targetStructure.astype('float32')
     targetTexture = targetTexture.astype('float32')
 
-    np.save(out_dir + str(count) + ".original" + "QL" + str(JPEG_QUALITY), originalTarget)
-    np.save(out_dir + str(count) + ".compressed" + "QL" + str(JPEG_QUALITY), originalCompressed)
-    np.save(out_dir + str(count) + ".compressed_structure" + "QL" + str(JPEG_QUALITY), compressedStructure)
-    np.save(out_dir + str(count) + ".compressed_texture" + "QL" + str(JPEG_QUALITY), compressedTexture)
-    np.save(out_dir + str(count) + ".target_structure" + "QL" + str(JPEG_QUALITY), targetStructure)
-    np.save(out_dir + str(count) + ".target_texture" + "QL" + str(JPEG_QUALITY), targetTexture)
+    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".original", originalTarget)
+    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed", originalCompressed)
+    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed_structure", compressedStructure)
+    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed_texture", compressedTexture)
+    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".target_structure", targetStructure)
+    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".target_texture", targetTexture)
 
 
 def saveImages(img, out_dir, count, img_num):
@@ -144,7 +144,9 @@ def process(file, image_num):
 
         # spit images into tiles
         if SEGMENT_IMAGES:
+
             while x_stride < image.shape[0] - PATCH_SIZE - 1:
+                y_stride = 0
                 while y_stride < image.shape[1] - PATCH_SIZE - 1:
                     tmp = image[x_stride:(x_stride + PATCH_SIZE), y_stride:(y_stride + PATCH_SIZE), ...]
 
@@ -157,6 +159,7 @@ def process(file, image_num):
 
                     y_stride += STRIDE
                 x_stride += STRIDE
+
         else:
             if SUB_DIR_FOR_EACH_EXAMPLE:
                 saveImages(image, out_dir + "_tmp/", count, image_num)

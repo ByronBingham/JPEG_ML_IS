@@ -21,9 +21,10 @@ _CITATION = """
 class Bsds500_greyscale_ql10(tfds.core.GeneratorBasedBuilder):
     """DatasetBuilder for div2k_tile128 dataset."""
 
-    VERSION = tfds.core.Version('1.0.0')
+    VERSION = tfds.core.Version('1.1.0')
     RELEASE_NOTES = {
         '1.0.0': 'Initial release.',
+        '1.1.0': 'Added splits and features. Changed to tile32'
     }
 
     def _info(self) -> tfds.core.DatasetInfo:
@@ -34,6 +35,13 @@ class Bsds500_greyscale_ql10(tfds.core.GeneratorBasedBuilder):
             features=tfds.features.FeaturesDict({
                 # These are the features of your dataset like images, labels ...
                 'original': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32, encoding='zlib'),
+                'target_structure': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32,
+                                                         encoding='zlib'),
+                'target_texture': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32, encoding='zlib'),
+                'compressed_structure': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32,
+                                                             encoding='zlib'),
+                'compressed_texture': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32,
+                                                           encoding='zlib'),
                 'compressed': tfds.features.Tensor(shape=(None, None, 1), dtype=tf.dtypes.float32, encoding='zlib')
             }),
             # If there's a common (input, target) tuple from the
@@ -47,10 +55,12 @@ class Bsds500_greyscale_ql10(tfds.core.GeneratorBasedBuilder):
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
         """Returns SplitGenerators."""
 
-        path_train = Path("e:/datasets/BSDS500/greyscale_preprocessed_QL10/")
+        path_train = Path("e:/datasets/BSDS500/greyscale_preprocessed_tile32_QL10/train/")
+        path_test = Path("e:/datasets/BSDS500/greyscale_preprocessed_tile32_QL10/test/")
 
         return {
-            'test': self._generate_examples(path_train),
+            'train': self._generate_examples(path_train),
+            'test': self._generate_examples(path_test),
         }
 
     def _generate_examples(self, path):
@@ -60,12 +70,24 @@ class Bsds500_greyscale_ql10(tfds.core.GeneratorBasedBuilder):
 
             baseName = str(f).replace("original.npy", "")
 
+            target_structure = np.load(baseName + "target_structure.npy")
+            target_texture = np.load(baseName + "target_texture.npy")
+            compressed_structure = np.load(baseName + "compressed_structure.npy")
+            compressed_texture = np.load(baseName + "compressed_texture.npy")
             compressed = np.load(baseName + "compressed.npy")
 
             original = np.expand_dims(original, axis=-1)
+            target_structure = np.expand_dims(target_structure, axis=-1)
+            target_texture = np.expand_dims(target_texture, axis=-1)
+            compressed_structure = np.expand_dims(compressed_structure, axis=-1)
+            compressed_texture = np.expand_dims(compressed_texture, axis=-1)
             compressed = np.expand_dims(compressed, axis=-1)
 
             yield str(f), {
                 'original': original,
+                'target_structure': target_structure,
+                'target_texture': target_texture,
+                'compressed_structure': compressed_structure,
+                'compressed_texture': compressed_texture,
                 'compressed': compressed
             }

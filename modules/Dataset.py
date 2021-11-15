@@ -16,7 +16,7 @@ from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 
 from modules.NNConfig import DATASET_PREFETCH, L0_GRADIENT_MIN_LAMDA, \
     L0_GRADIENT_MIN_BETA_MAX, TRAINING_DATASET, DATASETS_DIR, DATASET_EARLY_STOP, TRAIN_EARLY_STOP, \
-    VALIDATION_EARLY_STOP, TEST_EARLY_STOP, EVEN_PAD_DATA, TEST_BATCH_SIZE
+    VALIDATION_EARLY_STOP, TEST_EARLY_STOP, EVEN_PAD_DATA, TEST_BATCH_SIZE, TEST_DATASET, VALIDATION_DATASET
 
 BATCH_COMPRESSED = 0
 BATCH_TARGET = 1
@@ -35,10 +35,10 @@ class JPEGDataset(object):
             self.ds = self.ds = tfds.load(TRAINING_DATASET, data_dir=DATASETS_DIR, shuffle_files=True,
                                           split='train', batch_size=batch_size)
         elif dataset_type == 'validation':
-            self.ds = self.ds = tfds.load(TRAINING_DATASET, data_dir=DATASETS_DIR, shuffle_files=True,
+            self.ds = self.ds = tfds.load(VALIDATION_DATASET, data_dir=DATASETS_DIR, shuffle_files=True,
                                           split='validation', batch_size=batch_size)
         elif dataset_type == 'test':
-            self.ds = tfds.load('urban100_dataset4x', data_dir=DATASETS_DIR, batch_size=TEST_BATCH_SIZE)['test']
+            self.ds = tfds.load(TEST_DATASET, data_dir=DATASETS_DIR, batch_size=TEST_BATCH_SIZE)['test']
 
         self.ds = self.ds.prefetch(DATASET_PREFETCH)
         self.ds_iter = iter(self.ds)
