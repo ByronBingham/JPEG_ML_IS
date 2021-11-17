@@ -11,18 +11,18 @@ import numpy as np
 from L0GradientMin.l0_gradient_minimization import l0_gradient_minimization_2d
 from modules.NNConfig import L0_GRADIENT_MIN_LAMDA, L0_GRADIENT_MIN_BETA_MAX
 
-DATASET_PATH = Path('e:/datasets/BSDS500/custom_splits/train/')
-OUTPUT_PATH = 'e:/datasets/BSDS500/greyscale_preprocessed_tile32_QL10/train/'
+DATASET_PATH = Path('e:/datasets/div2k_dataset/downloads/extracted/train/')
+OUTPUT_PATH = 'e:/datasets/div2k_dataset/greyscale_preprocessed_tile128_QL10/train/'
 
-FILE_SUFFIX = '*.jpg'
+FILE_SUFFIX = '*.png'
 DIFF_FILE_SUFFIX = '.original.npy'
 
-SAVE_FORMAT = 'npy'  # 'png'
+SAVE_FORMAT = 'png'  # 'png' 'npy'
 OUTPUT_SEPARATE_DIR = False
 SUB_DIR_FOR_EACH_EXAMPLE = True
 
-PATCH_SIZE = 32
-STRIDE = 21
+PATCH_SIZE = 128  # 32
+STRIDE = 87  # 21
 
 SEGMENT_IMAGES = True
 AUGMENT_IMAGES = True
@@ -33,7 +33,7 @@ CONVERT_TO_GREYSCALE = True
 JPEG_QUALITY = 10
 
 SKIP = -1
-PROCESSES = 1#5
+PROCESSES = 15
 MAX_TASKS_PER_CHILD = 1
 
 
@@ -51,19 +51,54 @@ def STRRN_processing_and_save(original, compressed, out_dir, count):
                                                   beta_max=L0_GRADIENT_MIN_BETA_MAX)
     targetTexture = np.subtract(originalTarget, targetStructure)
 
-    originalTarget = originalTarget.astype('float32')
-    originalCompressed = originalCompressed.astype('float32')
-    compressedStructure = compressedStructure.astype('float32')
-    compressedTexture = compressedTexture.astype('float32')
-    targetStructure = targetStructure.astype('float32')
-    targetTexture = targetTexture.astype('float32')
+    if SAVE_FORMAT == 'npy':
+        originalTarget = originalTarget.astype('float32')
+        originalCompressed = originalCompressed.astype('float32')
+        compressedStructure = compressedStructure.astype('float32')
+        compressedTexture = compressedTexture.astype('float32')
+        targetStructure = targetStructure.astype('float32')
+        targetTexture = targetTexture.astype('float32')
 
-    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".original", originalTarget)
-    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed", originalCompressed)
-    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed_structure", compressedStructure)
-    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed_texture", compressedTexture)
-    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".target_structure", targetStructure)
-    np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".target_texture", targetTexture)
+        np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".original", originalTarget)
+        np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed", originalCompressed)
+        np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed_structure", compressedStructure)
+        np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed_texture", compressedTexture)
+        np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".target_structure", targetStructure)
+        np.save(out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".target_texture", targetTexture)
+
+    elif SAVE_FORMAT == 'png':
+        originalTarget = originalTarget * 255
+        originalCompressed = originalCompressed * 255
+        compressedStructure = compressedStructure * 255
+        compressedTexture = compressedTexture * 255
+        targetStructure = targetStructure * 255
+        targetTexture = targetTexture * 255
+
+        originalTarget = originalTarget.astype('uint8')
+        originalCompressed = originalCompressed.astype('uint8')
+        compressedStructure = compressedStructure.astype('uint8')
+        compressedTexture = compressedTexture.astype('uint8')
+        targetStructure = targetStructure.astype('uint8')
+        targetTexture = targetTexture.astype('uint8')
+
+        originalTarget = Image.fromarray(originalTarget)
+        originalCompressed = Image.fromarray(originalCompressed)
+        compressedStructure = Image.fromarray(compressedStructure)
+        compressedTexture = Image.fromarray(compressedTexture)
+        targetStructure = Image.fromarray(targetStructure)
+        targetTexture = Image.fromarray(targetTexture)
+
+        originalTarget.save(fp=out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".original" + ".png", format='PNG')
+        originalCompressed.save(fp=out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed" + ".png",
+                                format='PNG')
+        compressedStructure.save(fp=out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed_structure" + ".png",
+                                 format='PNG')
+        compressedTexture.save(fp=out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".compressed_texture" + ".png",
+                               format='PNG')
+        targetStructure.save(fp=out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".target_structure" + ".png",
+                             format='PNG')
+        targetTexture.save(fp=out_dir + str(count) + "QL" + str(JPEG_QUALITY) + ".target_texture" + ".png",
+                           format='PNG')
 
 
 def saveImages(img, out_dir, count, img_num):

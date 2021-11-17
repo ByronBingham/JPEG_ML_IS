@@ -405,10 +405,10 @@ class TrainNN:
             diff = diff * 255.0
             diff = diff.astype('uint8')
             diff_img = Image.fromarray(diff)
-            diff_img.save("./sampleImages/" + file + ".png" + ".diff.jpg")
+            diff_img.save("./sampleImages/" + file + ".diff.jpg")
 
             # smoothing
-            pil_img_c = Image.open("./sampleImages/" + file + ".png" + ".compressed.jpg")
+            pil_img_c = Image.open("./sampleImages/" + file + ".compressed.jpg")
             pil_img_c = np.asarray(pil_img_c)
             pil_img_c = pil_img_c / 255.0
             smoothed_img_c = l0_gradient_minimization_2d(pil_img_c, lmd=L0_GRADIENT_MIN_LAMDA,
@@ -420,7 +420,15 @@ class TrainNN:
             out = Image.fromarray(smoothed_img_c)
             out.save("./sampleImages/" + file + ".png" + ".compressed.smoothed.png", format="PNG")
 
-            # uncompressed images
+            # texture
+            texture = pil_img_c - smoothed_img_c
+            texture = np.clip(texture, a_min=0.0, a_max=1.0)
+            texture = texture * 255.0
+            texture = texture.astype('uint8')
+            texture_out = Image.fromarray(texture)
+            texture_out.save("./sampleImages/" + file + ".compressed.texture.png", format="PNG")
+
+            # structure uncompressed
             pil_img = Image.open("./sampleImages/" + file + ".png")
             pil_img = np.asarray(pil_img)
             pil_img = pil_img / 255.0
@@ -431,7 +439,15 @@ class TrainNN:
             smoothed_img = smoothed_img * 255.0
             smoothed_img = smoothed_img.astype('uint8')
             out = Image.fromarray(smoothed_img)
-            out.save("./sampleImages/" + file + ".png" + ".smoothed.png", format="PNG")
+            out.save("./sampleImages/" + file + ".smoothed.png", format="PNG")
+
+            # texture uncompressed
+            texture = pil_img - smoothed_img
+            texture = np.clip(texture, a_min=0.0, a_max=1.0)
+            texture = texture * 255.0
+            texture = texture.astype('uint8')
+            texture_out = Image.fromarray(texture)
+            texture_out.save("./sampleImages/" + file + ".texture.png", format="PNG")
 
     def sample_output_images(self, epoch):
         for file in SAMPLE_IMAGES:

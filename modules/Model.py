@@ -1522,6 +1522,172 @@ def DC_Hourglass_Interconnect_Top_Half_4():
     return model
 
 
+def DC_Hourglass_Interconnect_Top_Half_5():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_3('conv', structure_input)
+    text_conv_1 = HourglassLayer_3('conv', texture_input)
+
+    struct_sum_1 = Concatenate()([struct_conv_1, text_conv_1])
+    text_sum_1 = Concatenate()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = HourglassLayer_3('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_3('conv', text_sum_1)
+
+    struct_sum_2 = Concatenate()([struct_conv_2, text_conv_2])
+    text_sum_2 = Concatenate()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = HourglassLayer_3('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_3('conv', text_sum_2)
+
+    struct_sum_3 = Concatenate()([struct_conv_3, text_conv_3])
+    text_sum_3 = Concatenate()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = HourglassLayer_3('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_3('conv1to1', text_sum_3)
+
+    struct_sum_4 = Concatenate()([struct_conv_4, text_conv_4])
+    text_sum_4 = Concatenate()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = HourglassLayer_3('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_3('deconv', text_sum_4)
+
+    struct_sum_5 = Concatenate()([struct_deconv_1, text_deconv_1, struct_conv_2])
+    text_sum_5 = Concatenate()([struct_deconv_1, text_deconv_1, text_conv_2])
+
+    struct_deconv_2 = HourglassLayer_3('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_3('deconv', text_sum_5)
+
+    struct_sum_6 = Concatenate()([struct_deconv_2, text_deconv_2, struct_conv_1])
+    text_sum_6 = Concatenate()([struct_deconv_2, text_deconv_2, text_conv_1])
+
+    struct_deconv_3 = HourglassLayer_3('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_3('deconv', text_sum_6)
+
+    struct_pre_out = Conv2D(filters=32, kernel_size=3, padding='same')
+    text_pre_out = Conv2D(filters=32, kernel_size=3, padding='same')
+
+    struct_pre_out_1 = struct_pre_out(struct_deconv_3)
+    text_pre_out_1 = text_pre_out(text_deconv_3)
+    struct_pre_out_2 = struct_pre_out(struct_pre_out_1)
+    text_pre_out_2 = text_pre_out(text_pre_out_1)
+    struct_pre_out_3 = struct_pre_out(struct_pre_out_2)
+    text_pre_out_3 = text_pre_out(text_pre_out_2)
+
+    struct_out = Conv2D(filters=1, kernel_size=3, padding='same')(struct_pre_out_3)
+    text_out = Conv2D(filters=1, kernel_size=3, padding='same')(text_pre_out_3)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=[struct_out, text_out])
+
+    return model
+
+
+def DC_Hourglass_Interconnect_Top_Half_6():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_3('conv', structure_input)
+    text_conv_1 = HourglassLayer_3('conv', texture_input)
+
+    struct_sum_1 = Concatenate()([struct_conv_1, text_conv_1])
+    text_sum_1 = Add()([struct_conv_1, text_conv_1])
+
+    struct_conv_2 = HourglassLayer_3('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_3('conv', text_sum_1)
+
+    struct_sum_2 = Concatenate()([struct_conv_2, text_conv_2])
+    text_sum_2 = Add()([struct_conv_2, text_conv_2])
+
+    struct_conv_3 = HourglassLayer_3('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_3('conv', text_sum_2)
+
+    struct_sum_3 = Concatenate()([struct_conv_3, text_conv_3])
+    text_sum_3 = Add()([struct_conv_3, text_conv_3])
+
+    struct_conv_4 = HourglassLayer_3('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_3('conv1to1', text_sum_3)
+
+    struct_sum_4 = Concatenate()([struct_conv_4, text_conv_4])
+    text_sum_4 = Add()([struct_conv_4, text_conv_4])
+
+    struct_deconv_1 = HourglassLayer_3('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_3('deconv', text_sum_4)
+
+    struct_sum_5 = Concatenate()([struct_deconv_1, text_deconv_1, struct_conv_2])
+    text_sum_5 = Add()([struct_deconv_1, text_deconv_1, text_conv_2])
+
+    struct_deconv_2 = HourglassLayer_3('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_3('deconv', text_sum_5)
+
+    struct_sum_6 = Concatenate()([struct_deconv_2, text_deconv_2, struct_conv_1])
+    text_sum_6 = Add()([struct_deconv_2, text_deconv_2, text_conv_1])
+
+    struct_deconv_3 = HourglassLayer_3('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_3('deconv', text_sum_6)
+
+    struct_out = Conv2D(filters=1, kernel_size=3, padding='same')(struct_deconv_3)
+    text_out = Conv2D(filters=1, kernel_size=3, padding='same')(text_deconv_3)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=[struct_out, text_out])
+
+    return model
+
+
+def DC_Hourglass_Interconnect_Top_Half_7():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    structure_separator = Conv2D(filters=32, kernel_size=3, padding='same')
+    texture_separator = Conv2D(filters=32, kernel_size=3, padding='same')
+
+    struct_conv_1 = HourglassLayer_3('conv', structure_input)
+    text_conv_1 = HourglassLayer_3('conv', texture_input)
+
+    struct_sum_1 = structure_separator(Concatenate()([struct_conv_1, text_conv_1]))
+    text_sum_1 = texture_separator(Add()([struct_conv_1, text_conv_1]))
+
+    struct_conv_2 = HourglassLayer_3('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_3('conv', text_sum_1)
+
+    struct_sum_2 = structure_separator(Concatenate()([struct_conv_2, text_conv_2]))
+    text_sum_2 = texture_separator(Add()([struct_conv_2, text_conv_2]))
+
+    struct_conv_3 = HourglassLayer_3('conv', struct_sum_2)
+    text_conv_3 = HourglassLayer_3('conv', text_sum_2)
+
+    struct_sum_3 = structure_separator(Concatenate()([struct_conv_3, text_conv_3]))
+    text_sum_3 = texture_separator(Add()([struct_conv_3, text_conv_3]))
+
+    struct_conv_4 = HourglassLayer_3('conv1to1', struct_sum_3)
+    text_conv_4 = HourglassLayer_3('conv1to1', text_sum_3)
+
+    struct_sum_4 = structure_separator(Concatenate()([struct_conv_4, text_conv_4]))
+    text_sum_4 = texture_separator(Add()([struct_conv_4, text_conv_4]))
+
+    struct_deconv_1 = HourglassLayer_3('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_3('deconv', text_sum_4)
+
+    struct_sum_5 = structure_separator(Concatenate()([struct_deconv_1, text_deconv_1, struct_conv_2]))
+    text_sum_5 = texture_separator(Add()([struct_deconv_1, text_deconv_1, text_conv_2]))
+
+    struct_deconv_2 = HourglassLayer_3('deconv', struct_sum_5)
+    text_deconv_2 = HourglassLayer_3('deconv', text_sum_5)
+
+    struct_sum_6 = structure_separator(Concatenate()([struct_deconv_2, text_deconv_2, struct_conv_1]))
+    text_sum_6 = texture_separator(Add()([struct_deconv_2, text_deconv_2, text_conv_1]))
+
+    struct_deconv_3 = HourglassLayer_3('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_3('deconv', text_sum_6)
+
+    struct_out = Conv2D(filters=1, kernel_size=3, padding='same')(struct_deconv_3)
+    text_out = Conv2D(filters=1, kernel_size=3, padding='same')(text_deconv_3)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=[struct_out, text_out])
+
+    return model
+
+
 def DC_Hourglass_Interconnect_Bottom_Half_1():
     structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
     texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
@@ -1536,8 +1702,6 @@ def DC_Hourglass_Interconnect_Bottom_Half_1():
 
     return model
 
-# TODO: pre-train hourglass dual channels like with STRRN
-# TODO: try concatenating instead of adding in various places
 
 modelSwitch = {
     'eqlri': EQLRI_model,
@@ -1567,5 +1731,7 @@ modelSwitch = {
     'dc_hourglass_interconnect_top_half_2': DC_Hourglass_Interconnect_Top_Half_2,
     'dc_hourglass_interconnect_top_half_3': DC_Hourglass_Interconnect_Top_Half_3,
     'dc_hourglass_interconnect_top_half_4': DC_Hourglass_Interconnect_Top_Half_4,
+    'dc_hourglass_interconnect_top_half_5': DC_Hourglass_Interconnect_Top_Half_5,
+    'dc_hourglass_interconnect_top_half_6': DC_Hourglass_Interconnect_Top_Half_6,
     'dc_hourglass_interconnect_bottom_half_1': DC_Hourglass_Interconnect_Bottom_Half_1,
 }
