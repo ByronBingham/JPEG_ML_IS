@@ -200,6 +200,7 @@ class TestNN:
         avg_ssim = total_ssim / batches / 3
         avg_accuracy = total_accuracy / batches / 3
 
+        # TODO: add psnr-b
         lossFile = open(self.lossTestCsv, "a")
         psnrFile = open(self.psnrTestCsv, "a")
         ssimFile = open(self.ssimTestCsv, "a")
@@ -236,7 +237,6 @@ class TestNN:
         for c in range(3):
             self.models[c].load_weights(TEST_CHECKPOINT_DIR + "modelCheckpoint_ch" + str(c) + "_" + NN_MODEL)
         print("Weights loaded")
-
 
     def save_testing_results(self):
         if not os.path.exists("../savedResults/"):

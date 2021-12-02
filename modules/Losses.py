@@ -56,9 +56,12 @@ def MGE_MSE_combinedLoss(outputs, targets):
 
 def JPEGLoss(outputs, targets, inputs):
     if LOSS_FUNCTION == 'mge_mse':
+        outputs = np.asarray(outputs)
         out = MGE_MSE_combinedLoss(outputs, targets)
     elif LOSS_FUNCTION == 'mprrn_loss':
         out = MPRRN_Loss(outputs, targets, inputs)
+    elif LOSS_FUNCTION == 'mprrn_mse':
+        out = 0.2 * float(MPRRN_Loss(outputs, targets, inputs)) + tf.losses.mse(targets, outputs)
     else:  # mse
         out = tf.losses.mse(targets, outputs)
 

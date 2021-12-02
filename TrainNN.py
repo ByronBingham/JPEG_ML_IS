@@ -10,7 +10,8 @@ from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_S
     SAVE_AND_CONTINUE, ACCURACY_PSNR_THRESHOLD, MPRRN_RRU_PER_IRB, MPRRN_IRBS, L0_GRADIENT_MIN_LAMDA, \
     DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING, PRETRAINED_MPRRN_PATH, \
     PRETRAINED_STRUCTURE_PATH, PRETRAINED_TEXTURE_PATH, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF, LOSS_FUNCTION, \
-    L0_GRADIENT_MIN_BETA_MAX, SAVE_TEST_OUT, USE_CPU_FOR_HIGH_MEMORY, TRAINING_DATASET, TOP_HALF_MODEL, IMAGE_CHANNELS
+    L0_GRADIENT_MIN_BETA_MAX, SAVE_TEST_OUT, USE_CPU_FOR_HIGH_MEMORY, TRAINING_DATASET, TOP_HALF_MODEL, IMAGE_CHANNELS, \
+    DROPOUT_MODELS, DROPOUT_RATE, OPTIMIZER, OPTIMIZER_NAME, MPRRN_FILTERS_PER_LAYER
 from modules.Dataset import JPEGDataset, preprocessInputsForSTRRN
 from modules.Losses import JPEGLoss
 from PIL import Image
@@ -62,9 +63,13 @@ class TrainNN:
         elif IMAGE_CHANNELS == 3:
             self.info = "rgb" + self.info
 
-        self.info = self.info + "_QL" + str(JPEG_QUALITY) + "filterShape" + "_batchSize" + str(
-            BATCH_SIZE) + "_learningRate" + str(LEARNING_RATE) + "_filterShape" + str(
-            MPRRN_FILTER_SHAPE) + "_" + TRAINING_DATASET + "_loss_" + LOSS_FUNCTION
+        if NN_MODEL in DROPOUT_MODELS:
+            self.info = self.info + "drop" + str(DROPOUT_RATE) + "_"
+
+        self.info = self.info + "_QL" + str(JPEG_QUALITY) + "filtersPerConv" + str(
+            MPRRN_FILTERS_PER_LAYER) + "_batchSize" + str(BATCH_SIZE) + "_learningRate" + str(
+            LEARNING_RATE) + "_filterShape" + str(
+            MPRRN_FILTER_SHAPE) + "_" + TRAINING_DATASET + "_loss_" + LOSS_FUNCTION + "_" + OPTIMIZER_NAME
 
         self.saveFile = self.info + ".save"
         self.psnrTrainCsv = "./stats/psnr_train.csv"
@@ -162,6 +167,7 @@ class TrainNN:
         if "dc_hourglass_interconnect_bottom_half_" in NN_MODEL:
             structure_out, texture_out = self.dcOutModels[c](
                 [compressed_structure[..., c:c + 1], compressed_texture[..., c:c + 1]])
+            return self.models[c]([structure_out[..., c:c + 1], texture_out[..., c:c + 1]], training=True)
         if NN_MODEL in DUAL_CHANNEL_MODELS:
             return self.models[c]([compressed_structure[..., c:c + 1], compressed_texture[..., c:c + 1]],
                                   training=True)
@@ -227,7 +233,7 @@ class TrainNN:
         return model_out, loss, psnr, ssim
 
     def do_epoch(self, epoch, learningRate):
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learningRate, epsilon=ADAM_EPSILON)
+        optimizer = OPTIMIZER
         batches = 0
         total_loss = 0.0
         total_psnr = 0.0
@@ -483,6 +489,14 @@ class TrainNN:
 
                 if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
                     model_out = np.append(model_out[0], model_out[1], axis=1)
+
+                structure_out, texture_out = None, None
+                if 'dc_hourglass_interconnect_bottom_half' in NN_MODEL:
+                    structure_out, texture_out = self.dcOutModels[c](
+                        [structureIn[..., c:c + 1], textureIn[..., c:c + 1]])
+                    tmp_out = np.append(structure_out, texture_out, axis=1)
+                    tmp_out = np.append(tmp_out, model_out, axis=1)
+                    model_out = tmp_out
 
                 channels_out.append(np.asarray(model_out))
 
