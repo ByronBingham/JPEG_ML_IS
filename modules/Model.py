@@ -2609,6 +2609,50 @@ def DC_Hourglass_Interconnect_Top_Half_22():
     return model
 
 
+def DC_Hourglass_Interconnect_Top_Half_23():
+    structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+    texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
+
+    struct_conv_1 = HourglassLayer_5('conv', structure_input)
+    text_conv_1 = HourglassLayer_5('conv', texture_input)
+
+    struct_sum_1 = Conv2D(filters=32, kernel_size=3, padding='same')(Concatenate()([struct_conv_1, text_conv_1]))
+    text_sum_1 = Conv2D(filters=32, kernel_size=3, padding='same')(Concatenate()([struct_conv_1, text_conv_1]))
+
+    struct_conv_2 = HourglassLayer_5('conv', struct_sum_1)
+    text_conv_2 = HourglassLayer_5('conv', text_sum_1)
+
+    struct_sum_2 = Conv2D(filters=32, kernel_size=3, padding='same')(Concatenate()([struct_conv_2, text_conv_2]))
+    text_sum_2 = Conv2D(filters=32, kernel_size=3, padding='same')(Concatenate()([struct_conv_2, text_conv_2]))
+
+    struct_conv_4 = HourglassLayer_5('conv1to1', struct_sum_2)
+    text_conv_4 = HourglassLayer_5('conv1to1', text_sum_2)
+
+    struct_sum_4 = Conv2D(filters=32, kernel_size=3, padding='same')(Concatenate()([struct_conv_4, text_conv_4]))
+    text_sum_4 = Conv2D(filters=32, kernel_size=3, padding='same')(Concatenate()([struct_conv_4, text_conv_4]))
+
+    struct_deconv_1 = HourglassLayer_5('deconv', struct_sum_4)
+    text_deconv_1 = HourglassLayer_5('deconv', text_sum_4)
+
+    struct_sum_6 = Conv2D(filters=32, kernel_size=3, padding='same')(
+        Concatenate()([struct_deconv_1, text_deconv_1, struct_conv_1]))
+    text_sum_6 = Conv2D(filters=32, kernel_size=3, padding='same')(
+        Concatenate()([struct_deconv_1, text_deconv_1, text_conv_1]))
+
+    struct_deconv_3 = HourglassLayer_5('deconv', struct_sum_6)
+    text_deconv_3 = HourglassLayer_5('deconv', text_sum_6)
+
+    struct_pre_out = Add()([struct_deconv_3, structure_input])
+    text_pre_out = Add()([text_deconv_3, texture_input])
+
+    struct_out = Conv2D(filters=1, kernel_size=3, padding='same')(struct_pre_out)
+    text_out = Conv2D(filters=1, kernel_size=3, padding='same')(text_pre_out)
+
+    model = tf.keras.Model(inputs=[structure_input, texture_input], outputs=[struct_out, text_out])
+
+    return model
+
+
 def DC_Hourglass_Interconnect_Bottom_Half_1():
     structure_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
     texture_input = Input(shape=INPUT_SHAPE, dtype=tf.dtypes.float32)
@@ -2685,6 +2729,7 @@ modelSwitch = {
     'dc_hourglass_interconnect_top_half_20': DC_Hourglass_Interconnect_Top_Half_20,
     'dc_hourglass_interconnect_top_half_21': DC_Hourglass_Interconnect_Top_Half_21,
     'dc_hourglass_interconnect_top_half_22': DC_Hourglass_Interconnect_Top_Half_22,
+    'dc_hourglass_interconnect_top_half_23': DC_Hourglass_Interconnect_Top_Half_23,
     'dc_hourglass_interconnect_bottom_half_1': DC_Hourglass_Interconnect_Bottom_Half_1,
     'dc_hourglass_interconnect_bottom_half_2': DC_Hourglass_Interconnect_Bottom_Half_2,
 }

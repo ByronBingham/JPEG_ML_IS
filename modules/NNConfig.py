@@ -5,14 +5,15 @@ from tensorflow.keras.optimizers import Adam, Adadelta, Nadam
 #######################################
 IMAGE_CHANNELS = 1
 INPUT_SHAPE = (None, None, IMAGE_CHANNELS)
-NN_MODEL = 'dc_hourglass_interconnect_bottom_half_2'
+NN_MODEL = 'dc_hourglass_interconnect_top_half_19'
 DUAL_CHANNEL_MODELS = 'strrn strrn_encodedecode strrn_no_irb_residual strrn_no_irb_residual_encodedecode \
                 dualchannelinterconnect_4 dualchannelinterconnect_struct_encodedecode dc_hourglass_interconnect_11\
-                 dc_hourglass_interconnect_top_half_22 dc_hourglass_interconnect_bottom_half_2'
+                 dc_hourglass_interconnect_top_half_19 dc_hourglass_interconnect_bottom_half_2'
 DROPOUT_MODELS = 'dc_hourglass_interconnect_top_half_8 dc_hourglass_interconnect_top_half_9 \
     dc_hourglass_interconnect_top_half_10 dc_hourglass_interconnect_top_half_14 DC_Hourglass_Interconnect_Top_Half_15 \
      dc_hourglass_interconnect_top_half_16 dc_hourglass_interconnect_top_half_17 dc_hourglass_interconnect_top_half_18 \
-     dc_hourglass_interconnect_top_half_19 dc_hourglass_interconnect_top_half_20 dc_hourglass_interconnect_top_half_22'
+     dc_hourglass_interconnect_top_half_19 dc_hourglass_interconnect_top_half_20 dc_hourglass_interconnect_top_half_22 \
+                 dc_hourglass_interconnect_top_half_23'
 JPEG_QUALITY = 10
 
 # STRRN config
@@ -44,6 +45,7 @@ L0_GRADIENT_MIN_BETA_MAX = 10000
 # DC Hourglass config
 TOP_HALF_MODEL = 'dc_hourglass_interconnect_top_half_19'
 TEXTURE_MULTIPLIER = 1
+ADD_DC_MODEL_OUT = True
 
 #######################################
 # Train config
@@ -53,16 +55,16 @@ SAVE_AND_CONTINUE = True
 SAVE_TEST_OUT = True
 
 EPOCHS = 20
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.001
 LEARNING_RATE_DECAY_INTERVAL = 8
 LEARNING_RATE_DECAY = 0.99
 LOSS_FUNCTION = 'mprrn_mse'  # 'mge_mse' 'mprrn_loss' 'mse' 'mprrn_mse'
 GRAD_NORM = 1000.0  # max value for gradients. Clipping gradients to prevent NaN issues
 ADAM_EPSILON = 0.001
-OPTIMIZER = Adam(learning_rate=LEARNING_RATE, epsilon=ADAM_EPSILON)
+OPTIMIZER = Adadelta(learning_rate=LEARNING_RATE, rho=LEARNING_RATE_DECAY)
 # Adam(learning_rate=LEARNING_RATE, epsilon=ADAM_EPSILON)
 # Adadelta(learning_rate=LEARNING_RATE, rho=LEARNING_RATE_DECAY)
-OPTIMIZER_NAME = "Adam"
+OPTIMIZER_NAME = "Adadelta"
 
 if JPEG_QUALITY == 10:
     ACCURACY_PSNR_THRESHOLD = 28.43
@@ -85,7 +87,7 @@ TRAIN_EARLY_STOP = 10000  # number of batches
 VALIDATION_EARLY_STOP = 1
 TEST_EARLY_STOP = 100
 
-EVEN_PAD_DATA = 16  # 8  # should be powers of 2
+EVEN_PAD_DATA = 8  # 8  # should be powers of 2
 
 TRAIN_DIFF = False
 

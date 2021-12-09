@@ -11,7 +11,7 @@ from modules.NNConfig import EPOCHS, LEARNING_RATE, GRAD_NORM, NN_MODEL, BATCH_S
     DATASET_EARLY_STOP, DUAL_CHANNEL_MODELS, EVEN_PAD_DATA, MPRRN_FILTER_SHAPE, MPRRN_TRAINING, PRETRAINED_MPRRN_PATH, \
     PRETRAINED_STRUCTURE_PATH, PRETRAINED_TEXTURE_PATH, STRUCTURE_MODEL, TEXTURE_MODEL, TRAIN_DIFF, LOSS_FUNCTION, \
     L0_GRADIENT_MIN_BETA_MAX, SAVE_TEST_OUT, USE_CPU_FOR_HIGH_MEMORY, TRAINING_DATASET, TOP_HALF_MODEL, IMAGE_CHANNELS, \
-    DROPOUT_MODELS, DROPOUT_RATE, OPTIMIZER, OPTIMIZER_NAME, MPRRN_FILTERS_PER_LAYER
+    DROPOUT_MODELS, DROPOUT_RATE, OPTIMIZER, OPTIMIZER_NAME, MPRRN_FILTERS_PER_LAYER, ADD_DC_MODEL_OUT
 from modules.Dataset import JPEGDataset, preprocessInputsForSTRRN
 from modules.Losses import JPEGLoss
 from PIL import Image
@@ -197,6 +197,8 @@ class TrainNN:
         compressed = batch['compressed']
         if TRAIN_DIFF:
             diff = batch['diff']
+        else:
+            diff = None
 
         model_out = self.get_model_out(c, batch)
 
@@ -232,13 +234,37 @@ class TrainNN:
 
         return model_out, loss, psnr, ssim
 
+    @staticmethod
+    def get_dc_add_metrics(c, model_out, batch):
+        original = batch['original']
+        compressed = batch['compressed']
+
+        add_out = tf.add(model_out[0], model_out[1])
+
+        loss = JPEGLoss(add_out, original[..., c:c + 1], compressed[..., c:c + 1])
+        psnr = tf.image.psnr(original[..., c:c + 1], add_out, max_val=1.0)
+        ssim = tf.image.ssim(original[..., c:c + 1], add_out, max_val=1.0)
+
+        return loss, psnr, ssim
+
     def do_epoch(self, epoch, learningRate):
         optimizer = OPTIMIZER
         batches = 0
-        total_loss = 0.0
-        total_psnr = 0.0
-        total_ssim = 0.0
-        total_accuracy = 0.0
+        if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+            total_loss = [0.0, 0.0]
+            total_psnr = [0.0, 0.0]
+            total_ssim = [0.0, 0.0]
+            total_accuracy = [0.0, 0.0]
+            if ADD_DC_MODEL_OUT:
+                add_loss = 0.0
+                add_psnr = 0.0
+                add_ssim = 0.0
+                add_accuracy = 0.0
+        else:
+            total_loss = 0.0
+            total_psnr = 0.0
+            total_ssim = 0.0
+            total_accuracy = 0.0
         trainData = JPEGDataset('train', BATCH_SIZE)
 
         for batch in trainData:
@@ -248,12 +274,28 @@ class TrainNN:
                 with tf.GradientTape() as tape:
                     tape.watch(self.models[c].trainable_variables)
                     model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch)
+                    if ADD_DC_MODEL_OUT:
+                        tmp_add_loss, tmp_add_psnr, tmp_add_ssim = self.get_dc_add_metrics(c, model_out, batch)
 
-                    total_loss += np.average(loss)
-                    total_psnr += np.average(psnr)
-                    total_ssim += np.average(ssim)
-                    if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
-                        total_accuracy += 1
+                    if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+                        if ADD_DC_MODEL_OUT:
+                            add_loss += np.average(tmp_add_loss)
+                            add_psnr += np.average(tmp_add_psnr)
+                            add_ssim += np.average(tmp_add_ssim)
+                            if np.average(tmp_add_psnr) > ACCURACY_PSNR_THRESHOLD:
+                                add_accuracy += 1
+                        for i in range(2):
+                            total_loss[i] += np.average(loss[i])
+                            total_psnr[i] += np.average(psnr[i])
+                            total_ssim[i] += np.average(ssim[i])
+                            if np.average(psnr[i]) > ACCURACY_PSNR_THRESHOLD:
+                                total_accuracy[i] += 1
+                    else:
+                        total_loss += np.average(loss)
+                        total_psnr += np.average(psnr)
+                        total_ssim += np.average(ssim)
+                        if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
+                            total_accuracy += 1
 
                     gradients = tape.gradient(loss, self.models[c].trainable_variables)
                     gradients = [tf.clip_by_norm(g, GRAD_NORM) for g in gradients]
@@ -262,19 +304,51 @@ class TrainNN:
             print("Batch " + str(batches + 1) + " Complete", end="\r")
             batches = batches + 1
 
-        avg_loss = total_loss / batches / IMAGE_CHANNELS
-        avg_psnr = total_psnr / batches / IMAGE_CHANNELS
-        avg_ssim = total_ssim / batches / IMAGE_CHANNELS
-        avg_accuracy = total_accuracy / batches / IMAGE_CHANNELS
+        if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+            if ADD_DC_MODEL_OUT:
+                avg_add_loss = add_loss / batches / IMAGE_CHANNELS
+                avg_add_psnr = add_psnr / batches / IMAGE_CHANNELS
+                avg_add_ssim = add_ssim / batches / IMAGE_CHANNELS
+                avg_add_accuracy = add_accuracy / batches / IMAGE_CHANNELS
+            avg_loss = [0.0, 0.0]
+            avg_psnr = [0.0, 0.0]
+            avg_ssim = [0.0, 0.0]
+            avg_accuracy = [0.0, 0.0]
+            for i in range(2):
+                avg_loss[i] = total_loss[i] / batches / IMAGE_CHANNELS
+                avg_psnr[i] = total_psnr[i] / batches / IMAGE_CHANNELS
+                avg_ssim[i] = total_ssim[i] / batches / IMAGE_CHANNELS
+                avg_accuracy[i] = total_accuracy[i] / batches / IMAGE_CHANNELS
+        else:
+            avg_loss = total_loss / batches / IMAGE_CHANNELS
+            avg_psnr = total_psnr / batches / IMAGE_CHANNELS
+            avg_ssim = total_ssim / batches / IMAGE_CHANNELS
+            avg_accuracy = total_accuracy / batches / IMAGE_CHANNELS
 
         lossFile = open(self.lossTrainCsv, "a")
         psnrFile = open(self.psnrTrainCsv, "a")
         ssimFile = open(self.ssimTrainCsv, "a")
         accuracyFile = open(self.accuracyTrainCsv, "a")
-        lossFile.write(str(epoch) + "," + str(avg_loss) + "\n")
-        psnrFile.write(str(epoch) + "," + str(avg_psnr) + "\n")
-        ssimFile.write(str(epoch) + "," + str(avg_ssim) + "\n")
-        accuracyFile.write(str(epoch) + "," + str(avg_accuracy) + "\n")
+        if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+            if ADD_DC_MODEL_OUT:
+                lossFile.write(
+                    str(epoch) + "," + str(avg_loss[0]) + "," + str(avg_loss[1]) + "," + str(avg_add_loss) + "\n")
+                psnrFile.write(
+                    str(epoch) + "," + str(avg_psnr[0]) + "," + str(avg_psnr[1]) + "," + str(avg_add_psnr) + "\n")
+                ssimFile.write(
+                    str(epoch) + "," + str(avg_ssim[0]) + "," + str(avg_ssim[1]) + "," + str(avg_add_ssim) + "\n")
+                accuracyFile.write(str(epoch) + "," + str(avg_accuracy[0]) + "," + str(avg_accuracy[1]) + "," + str(
+                    avg_add_accuracy) + "\n")
+            else:
+                lossFile.write(str(epoch) + "," + str(avg_loss[0]) + "," + str(avg_loss[1]) + "\n")
+                psnrFile.write(str(epoch) + "," + str(avg_psnr[0]) + "," + str(avg_psnr[1]) + "\n")
+                ssimFile.write(str(epoch) + "," + str(avg_ssim[0]) + "," + str(avg_ssim[1]) + "\n")
+                accuracyFile.write(str(epoch) + "," + str(avg_accuracy[0]) + "," + str(avg_accuracy[1]) + "\n")
+        else:
+            lossFile.write(str(epoch) + "," + str(avg_loss) + "\n")
+            psnrFile.write(str(epoch) + "," + str(avg_psnr) + "\n")
+            ssimFile.write(str(epoch) + "," + str(avg_ssim) + "\n")
+            accuracyFile.write(str(epoch) + "," + str(avg_accuracy) + "\n")
         lossFile.close()
         psnrFile.close()
         ssimFile.close()
@@ -329,10 +403,21 @@ class TrainNN:
         accuracyFile.close()
 
     def do_test(self, epoch):
-        total_loss = 0.0
-        total_psnr = 0.0
-        total_ssim = 0.0
-        total_accuracy = 0.0
+        if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+            if ADD_DC_MODEL_OUT:
+                add_loss = 0.0
+                add_psnr = 0.0
+                add_ssim = 0.0
+                add_accuracy = 0.0
+            total_loss = [0.0, 0.0]
+            total_psnr = [0.0, 0.0]
+            total_ssim = [0.0, 0.0]
+            total_accuracy = [0.0, 0.0]
+        else:
+            total_loss = 0.0
+            total_psnr = 0.0
+            total_ssim = 0.0
+            total_accuracy = 0.0
         batches = 0
         testData = JPEGDataset('test', TEST_BATCH_SIZE)
 
@@ -341,42 +426,90 @@ class TrainNN:
             for c in range(IMAGE_CHANNELS):
 
                 model_out, loss, psnr, ssim = self.get_model_out_and_metrics(c, batch)
+                if ADD_DC_MODEL_OUT:
+                    tmp_add_loss, tmp_add_psnr, tmp_add_ssim = self.get_dc_add_metrics(c, model_out, batch)
 
                 if SAVE_TEST_OUT:
                     self.savePrediction(model_out, batch['original'], batches)
 
-                total_loss += np.average(loss)
-                total_psnr += np.average(psnr)
-                total_ssim += np.average(ssim)
-                if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
-                    total_accuracy += 1
+                if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+                    if ADD_DC_MODEL_OUT:
+                        add_loss += np.average(tmp_add_loss)
+                        add_psnr += np.average(tmp_add_psnr)
+                        add_ssim += np.average(tmp_add_ssim)
+                        if np.average(tmp_add_psnr) > ACCURACY_PSNR_THRESHOLD:
+                            add_accuracy += 1
+                    for i in range(2):
+                        total_loss[i] += np.average(loss[i])
+                        total_psnr[i] += np.average(psnr[i])
+                        total_ssim[i] += np.average(ssim[i])
+                        if np.average(psnr[i]) > ACCURACY_PSNR_THRESHOLD:
+                            total_accuracy[i] += 1
+                else:
+                    total_loss += np.average(loss)
+                    total_psnr += np.average(psnr)
+                    total_ssim += np.average(ssim)
+                    if np.average(psnr) > ACCURACY_PSNR_THRESHOLD:
+                        total_accuracy += 1
 
             batches += 1
 
-        avg_loss = total_loss / batches / IMAGE_CHANNELS
-        avg_psnr = total_psnr / batches / IMAGE_CHANNELS
-        avg_ssim = total_ssim / batches / IMAGE_CHANNELS
-        avg_accuracy = total_accuracy / batches / IMAGE_CHANNELS
+        if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+            if ADD_DC_MODEL_OUT:
+                avg_add_loss = add_loss / batches / IMAGE_CHANNELS
+                avg_add_psnr = add_psnr / batches / IMAGE_CHANNELS
+                avg_add_ssim = add_ssim / batches / IMAGE_CHANNELS
+                avg_add_accuracy = add_accuracy / batches / IMAGE_CHANNELS
+            avg_loss = [0.0, 0.0]
+            avg_psnr = [0.0, 0.0]
+            avg_ssim = [0.0, 0.0]
+            avg_accuracy = [0.0, 0.0]
+            for i in range(2):
+                avg_loss[i] = total_loss[i] / batches / IMAGE_CHANNELS
+                avg_psnr[i] = total_psnr[i] / batches / IMAGE_CHANNELS
+                avg_ssim[i] = total_ssim[i] / batches / IMAGE_CHANNELS
+                avg_accuracy[i] = total_accuracy[i] / batches / IMAGE_CHANNELS
+        else:
+            avg_loss = total_loss / batches / IMAGE_CHANNELS
+            avg_psnr = total_psnr / batches / IMAGE_CHANNELS
+            avg_ssim = total_ssim / batches / IMAGE_CHANNELS
+            avg_accuracy = total_accuracy / batches / IMAGE_CHANNELS
 
         lossFile = open(self.lossTestCsv, "a")
         psnrFile = open(self.psnrTestCsv, "a")
         ssimFile = open(self.ssimTestCsv, "a")
         accuracyFile = open(self.accuracyTestCsv, "a")
-        lossFile.write(str(epoch) + "," + str(avg_loss) + "\n")
-        psnrFile.write(str(epoch) + "," + str(avg_psnr) + "\n")
-        ssimFile.write(str(epoch) + "," + str(avg_ssim) + "\n")
-        accuracyFile.write(str(epoch) + "," + str(avg_accuracy) + "\n")
+        if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
+            if ADD_DC_MODEL_OUT:
+                lossFile.write(
+                    str(epoch) + "," + str(avg_loss[0]) + "," + str(avg_loss[1]) + "," + str(avg_add_loss) + "\n")
+                psnrFile.write(
+                    str(epoch) + "," + str(avg_psnr[0]) + "," + str(avg_psnr[1]) + "," + str(avg_add_psnr) + "\n")
+                ssimFile.write(
+                    str(epoch) + "," + str(avg_ssim[0]) + "," + str(avg_ssim[1]) + "," + str(avg_add_ssim) + "\n")
+                accuracyFile.write(str(epoch) + "," + str(avg_accuracy[0]) + "," + str(avg_accuracy[1]) + "," + str(
+                    avg_add_accuracy) + "\n")
+            else:
+                lossFile.write(str(epoch) + "," + str(avg_loss[0]) + "," + str(avg_loss[1]) + "\n")
+                psnrFile.write(str(epoch) + "," + str(avg_psnr[0]) + "," + str(avg_psnr[1]) + "\n")
+                ssimFile.write(str(epoch) + "," + str(avg_ssim[0]) + "," + str(avg_ssim[1]) + "\n")
+                accuracyFile.write(str(epoch) + "," + str(avg_accuracy[0]) + "," + str(avg_accuracy[1]) + "\n")
+        else:
+            lossFile.write(str(epoch) + "," + str(avg_loss) + "\n")
+            psnrFile.write(str(epoch) + "," + str(avg_psnr) + "\n")
+            ssimFile.write(str(epoch) + "," + str(avg_ssim) + "\n")
+            accuracyFile.write(str(epoch) + "," + str(avg_accuracy) + "\n")
         lossFile.close()
         psnrFile.close()
         ssimFile.close()
         accuracyFile.close()
 
         # save weights if this is the best psnr performance
-        if avg_psnr > self.best_psnr:
+        if np.average(avg_psnr) > self.best_psnr:
             if os.path.exists(CHECKPOINTS_PATH + "best/"):
                 shutil.rmtree(CHECKPOINTS_PATH + "best/")
             shutil.copytree(src=CHECKPOINTS_PATH, dst=CHECKPOINTS_PATH + "best/")
-            self.best_psnr = avg_psnr
+            self.best_psnr = np.average(avg_psnr)
 
             if SAVE_TEST_OUT:
                 if os.path.exists("predictions_best"):
@@ -488,7 +621,12 @@ class TrainNN:
                 model_out = self.get_model_out(c, batch)
 
                 if 'dc_hourglass_interconnect_top_half' in NN_MODEL:
-                    model_out = np.append(model_out[0], model_out[1], axis=1)
+                    if ADD_DC_MODEL_OUT:
+                        add_out = tf.add(model_out[0], model_out[1])
+                        model_out = np.append(model_out[0], model_out[1], axis=1)
+                        model_out = np.append(model_out, add_out, axis=1)
+                    else:
+                        model_out = np.append(model_out[0], model_out[1], axis=1)
 
                 structure_out, texture_out = None, None
                 if 'dc_hourglass_interconnect_bottom_half' in NN_MODEL:
